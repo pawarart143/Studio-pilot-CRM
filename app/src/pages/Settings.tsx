@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useForm, validate } from '@/lib/form';
 import { useUrlState } from '@/lib/hooks';
-import { fmtDate, inr } from '@/lib/format';
+import { fmtDate, fmtDateTime, inr } from '@/lib/format';
 import { Badge, Button, Card, CardHeader, Checkbox, EmptyState, ErrorState, Field, Input, Modal, PageHeader, SearchInput, Select, TableSkeleton, Tabs, Textarea, Toggle, useUi } from '@/components/ui';
 import { PortalCard, portalStatus } from '@/components/delivery';
 import { Link } from 'react-router-dom';
@@ -14,13 +14,14 @@ import EnquirySettings from '@/pages/enquiry/EnquirySettings';
 import PackagesTab from '@/pages/quotations/PackagesTab';
 import { LinesEditor, ScheduleEditor, linesFrom, milestonesFrom, num as qnum, type Milestone } from '@/pages/quotations/parts';
 import GoogleCalendarTab from '@/pages/settings/GoogleCalendarTab';
+import { NotificationPrefs } from '@/components/Notifications';
 
 export default function Settings() {
   const { can, member } = useAuth();
   const admin = can('settings.edit');
   const [f, setF] = useUrlState({ tab: admin ? 'studio' : 'profile' });
   const tabs: [string, string][] = admin
-    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['packages', 'Quote packages'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['whatsapp', 'WhatsApp'], ['calendar', 'Google Calendar'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
+    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['packages', 'Quote packages'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['reminders', 'Reminders'], ['whatsapp', 'WhatsApp'], ['calendar', 'Google Calendar'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
     : [['profile', 'My profile']];
   const tab = tabs.some(([k]) => k === f.tab) ? f.tab : tabs[0][0];
   return (
@@ -36,6 +37,7 @@ export default function Settings() {
           {tab === 'deliverables' && <TemplatesTab />}
           {tab === 'portal' && <PortalsTab />}
           {tab === 'enquiry' && <EnquirySettings />}
+          {tab === 'reminders' && <RemindersTab />}
           {tab === 'whatsapp' && <WhatsAppTab />}
           {tab === 'calendar' && <GoogleCalendarTab />}
           {tab === 'payments' && <RazorpayTab />}
@@ -63,6 +65,71 @@ function useSaveSettings() {
       return false;
     }
   };
+}
+
+/* ---------- Reminders (owner/admin) ---------- */
+const LEAD_OPTIONS: [string, string][] = [['5', '5 minutes'], ['10', '10 minutes'], ['15', '15 minutes'], ['30', '30 minutes (recommended)'], ['60', '1 hour'], ['120', '2 hours'], ['240', '4 hours'], ['1440', '1 day']];
+
+function RemindersTab() {
+  const { studio } = useAuth();
+  const s = studio.settings || {};
+  const save = useSaveSettings();
+  const [lead, setLead] = useState(String(s.reminder_lead_minutes ?? 30));
+  const [emails, setEmails] = useState(s.reminder_emails !== false);
+  const [busy, setBusy] = useState(false);
+  const st = useQuery({ queryKey: ['reminder-status'], queryFn: () => api.get('notifications/status'), refetchInterval: 60_000 });
+  const leadOpts = LEAD_OPTIONS.some(([k]) => k === lead) ? LEAD_OPTIONS : [...LEAD_OPTIONS, [lead, `${lead} minutes`] as [string, string]];
+  const submit = async () => {
+    setBusy(true);
+    await save({ settings: { reminder_lead_minutes: Number(lead), reminder_emails: emails } });
+    st.refetch();
+    setBusy(false);
+  };
+  const d = st.data;
+  const late = d && (d.last_run_ago === null || d.last_run_ago > 20 * 60);
+  return (
+    <div className="grid max-w-4xl gap-8 lg:grid-cols-[1fr_1fr]">
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold">Task and follow-up reminders</h3>
+          <p className="mt-1 text-sm text-muted">The person a task or follow-up is assigned to gets an email when it is scheduled, and a reminder email, a pop-up and a ring sound before it is due. Each person can turn these off for themselves under the bell icon.</p>
+        </div>
+        <Field label="Send the reminder" hint="How long before the due time."><Select value={lead} onChange={(e) => setLead(e.target.value)} options={leadOpts} /></Field>
+        <Toggle checked={emails} onChange={setEmails} label="Send reminder emails for this studio" />
+        <div><Button variant="primary" loading={busy} onClick={submit}>Save</Button></div>
+        <div className="border-t border-line pt-4">
+          <h3 className="mb-1 text-sm font-semibold">My own reminders</h3>
+          <NotificationPrefs />
+        </div>
+      </section>
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold">Email delivery and scheduler</h3>
+        {st.isLoading ? (
+          <TableSkeleton rows={3} cols={2} />
+        ) : st.isError ? (
+          <ErrorState error={st.error} onRetry={() => st.refetch()} />
+        ) : (
+          <div className="space-y-3 text-sm">
+            <div className="rounded-xl border border-line p-3">
+              <div className="flex items-center justify-between"><span className="text-muted">Scheduler last ran</span>{late ? <Badge tone="amber">{d.last_run ? fmtDateTime(d.last_run) : 'Not yet'}</Badge> : <Badge tone="green">{fmtDateTime(d.last_run)}</Badge>}</div>
+              <div className="mt-1.5 flex items-center justify-between"><span className="text-muted">Emails in the last 7 days</span><span className="tabular">{d.emails_7d.sent} sent · {d.emails_7d.pending} waiting · {d.emails_7d.failed} failed</span></div>
+              <div className="mt-1.5 flex items-center justify-between"><span className="text-muted">SMTP plugin</span>{d.smtp_plugin ? <Badge tone="green">{d.smtp_plugin}</Badge> : <Badge tone="amber">None found</Badge>}</div>
+              {d.last_error && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">Last failure ({fmtDateTime(d.last_error.at)}): {d.last_error.message}</p>}
+            </div>
+            {late && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">The scheduler hasn't run in the last 20 minutes. Reminder emails wait until it does. Add the server cron job below.</p>}
+            <div className="rounded-xl bg-subtle/60 p-3 text-xs leading-relaxed text-muted">
+              <p className="font-semibold text-ink">For reliable reminders</p>
+              <ol className="mt-1 list-decimal space-y-1 pl-4">
+                <li>Install an SMTP plugin such as <b>WP Mail SMTP</b> and connect it to Gmail / Google Workspace, Zoho Mail, Brevo or your host's mailbox. Then press <b>Send test</b> on the left.</li>
+                <li>In your hosting panel (cPanel → Cron Jobs, Hostinger → Cron Jobs), add a job every 5 minutes:<code className="mt-1 block break-all rounded bg-surface px-2 py-1 text-[11px] text-ink">wget -q -O - "{d.cron_url}" &gt;/dev/null 2&gt;&amp;1</code></li>
+                <li>Optionally add <code className="rounded bg-surface px-1">define('DISABLE_WP_CRON', true);</code> to wp-config.php once that job works{d.wp_cron_disabled ? ' (already set on this site)' : ''}.</li>
+              </ol>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
 /* ---------- Client portals (owner/admin) ---------- */
@@ -633,6 +700,10 @@ function ProfileTab() {
   };
   return (
     <div className="grid max-w-3xl gap-8 md:grid-cols-2">
+      <section className="space-y-2 md:col-span-2 md:order-last">
+        <h3 className="text-sm font-semibold">Reminders and notifications</h3>
+        <NotificationPrefs />
+      </section>
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Profile</h3>
         <p className="text-sm text-muted">{me.user?.email} · {config.roles[member.role]}</p>

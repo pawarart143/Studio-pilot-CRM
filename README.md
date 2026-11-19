@@ -107,6 +107,46 @@ ShootPilot sends changes through WP-Cron. If your host has `DISABLE_WP_CRON` set
 
 New tables `pcrm_gcal_accounts` (one per studio: Google email, encrypted tokens, calendar, settings, status), `pcrm_gcal_links` (record → Google event id, calendar and a hash of what was sent) and `pcrm_gcal_queue` (pending and failed changes with retry times). No existing table is changed. These tables have their own version option (`pcrm_gcal_db_version`), separate from the main DB version.
 
+## What's new in v0.6.0-reminders (task and follow-up reminders)
+
+Update with "Replace current with uploaded". Nothing is removed. One new table is added (`pcrm_notifications`), tracked by its own option `pcrm_reminders_db_version`, so it does not touch the shared DB version.
+
+**Who gets what.** The person a task or call follow-up is assigned to gets:
+- an **email when it is scheduled for them** (new, reassigned or rescheduled, including "next call" from Log call),
+- a **reminder email before it is due** (default 30 minutes, Settings → Reminders, 5 minutes to 1 day),
+- an **in-app pop-up and a ring sound** at the reminder time and again when it is due,
+- everything listed under the **bell icon**: *Due* (overdue and due today), *Alerts* (history, unread count, mark all read) and *Preferences*.
+
+**Rules.**
+- Nothing is sent for completed, cancelled, deleted, reassigned or rescheduled items: each email re-checks the item just before sending.
+- No duplicates: every reminder is unique per item, event, person and due time in the database, and each email is claimed before it is sent. Tested with four scheduler processes running at once.
+- If the "scheduled" email went out inside the reminder window, the separate reminder email is skipped (one email, not two).
+- Roles: reminders only go to people who can open the item (tasks need Tasks access; follow-ups need Leads access). Team members without a login, inactive members and other studios get nothing.
+- Sample data never sends emails.
+- Times use the studio time zone (Asia/Kolkata) and DD-MM-YYYY, even if WordPress is on UTC.
+
+**Ring sound.** Browsers only allow sound after you click or type on the page, so ShootPilot never plays sound on page load. Until you click, the alert shows on screen with "Sound is blocked until you click anywhere on the page". Each reminder rings once (the first open tab claims it; other tabs and devices stay quiet). Reminders more than 15 minutes overdue show without sound.
+
+**Per-user preferences** (bell → Preferences, or Settings → My profile): scheduled emails, reminder emails, pop-ups, ring sound, desktop notifications, and **Send test** email. Saved per user on the server.
+
+**Settings → Reminders (owner/admin):** reminder time, studio-wide email switch, when the scheduler last ran, emails sent / waiting / failed in the last 7 days, last error, and whether an SMTP plugin is active.
+
+**Emails** are HTML with the studio logo (or name), enquiry-form brand colour, details, an "Open task / Open follow-up call" button that goes straight to the item, and a plain-text version. Sender name is the studio name; Reply-To is the studio email.
+
+### Make sure emails arrive (please do this on your server)
+
+1. **Install an SMTP plugin** such as WP Mail SMTP, FluentSMTP or Post SMTP and connect it to Gmail / Google Workspace, Zoho Mail, Brevo or your host's mailbox. Without one, many hosts drop or spam-folder WordPress mail.
+2. Press **Send test** (bell → Preferences) and check the inbox and spam folder.
+3. **Add a real cron job** every 5 minutes, so reminders do not wait for someone to visit the site: `wget -q -O - "https://your-site.com/wp-cron.php?doing_wp_cron" >/dev/null 2>&1`. Then you may add `define('DISABLE_WP_CRON', true);` to wp-config.php. The open CRM also creates in-app alerts on its own every minute, even if cron is late.
+
+### Database changes (v0.6.0-reminders)
+
+| Table | Purpose |
+|---|---|
+| `pcrm_notifications` | One row per reminder: studio, member, item (task / follow-up), event (assigned / reminder / due), due time, email status (pending, sending, sent, failed, skipped), alerted and read times. Unique on studio + dedupe key. |
+
+Preferences are user meta `pcrm_notify_prefs`. Studio settings gain `reminder_lead_minutes` (30) and `reminder_emails` (on).
+
 ## What's new in v0.5.0 (Crew Scheduling and Public Enquiry Form)
 
 Update with "Replace current with uploaded". Nothing is removed. The update adds new tables and a few new columns on leads (see "Database changes (v0.5.0)").
@@ -291,6 +331,7 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 | Public enquiry form (v0.5.0) | Working. Tested by API (58 checks) and on a phone-size browser: steps, show/hide, multi-day, lead creation, UTM, duplicate review and merge, rate limits, two studios kept apart |
 | Cloudflare Turnstile on the enquiry form | Built, **not tested with real Turnstile keys** |
 | New-enquiry email | Uses `wp_mail`; only sent if the studio has an email and the server can send email |
+| Task and follow-up reminders (v0.6.0) | Emails tested end to end through `wp_mail` → PHPMailer → SMTP to a local test mail server (61 checks). **Delivery to real inboxes depends on your server's mail setup and is not verified.** Ring sound and pop-ups tested in Chromium. |
 | WhatsApp Cloud API sending | Built, **not tested against Meta** (no credentials yet) |
 | Razorpay payment links and webhook | Built and tested against simulated Razorpay responses, including webhook signature checks and duplicate webhooks. **Not yet tested with real Razorpay keys.** Try it with Test Mode keys first. |
 | Google sign-in | Built and tested against simulated Google responses. **Not yet tested with a real Google client ID.** |

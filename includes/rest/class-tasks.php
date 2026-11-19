@@ -26,6 +26,7 @@ class Tasks extends Base {
 	public function register() {
 		$this->route( '/tasks', 'GET', array( $this, 'index' ), 'tasks.view' );
 		$this->route( '/tasks', 'POST', array( $this, 'create' ), 'tasks.edit' );
+		$this->route( '/tasks/(?P<id>\d+)', 'GET', array( $this, 'show' ), 'tasks.view' );
 		$this->route( '/tasks/(?P<id>\d+)', 'PUT', array( $this, 'update' ), 'tasks.edit' );
 		$this->route( '/tasks/(?P<id>\d+)', 'DELETE', array( $this, 'destroy' ), 'tasks.edit' );
 	}
@@ -88,6 +89,15 @@ class Tasks extends Base {
 		$where = implode( ' AND ', $w ) . $this->scope();
 		$rows  = $wpdb->get_results( 'SELECT t.*, m.name AS assigned_name, m.color AS assigned_color, l.name AS lead_name, b.title AS booking_title, b.number AS booking_number FROM ' . Db::t( 'tasks' ) . ' t LEFT JOIN ' . Db::t( 'members' ) . ' m ON m.id=t.assigned_to LEFT JOIN ' . Db::t( 'leads' ) . ' l ON l.id=t.lead_id LEFT JOIN ' . Db::t( 'bookings' ) . " b ON b.id=t.booking_id WHERE $where ORDER BY t.status='done', t.due_at IS NULL, t.due_at ASC, FIELD(t.priority,'hot','high','medium','low') LIMIT 500" );
 		return $this->ok( Db::cast_all( $rows ) );
+	}
+
+	public function show( $req ) {
+		global $wpdb;
+		$t = $wpdb->get_row( $wpdb->prepare( 'SELECT t.*, m.name AS assigned_name, m.color AS assigned_color, l.name AS lead_name, b.title AS booking_title, b.number AS booking_number FROM ' . Db::t( 'tasks' ) . ' t LEFT JOIN ' . Db::t( 'members' ) . ' m ON m.id=t.assigned_to LEFT JOIN ' . Db::t( 'leads' ) . ' l ON l.id=t.lead_id LEFT JOIN ' . Db::t( 'bookings' ) . ' b ON b.id=t.booking_id WHERE t.id=%d AND t.studio_id=%d', (int) $req['id'], $this->sid() ) );
+		if ( ! $t || ! $this->can_touch( $t ) ) {
+			return $this->not_found( 'Task' );
+		}
+		return $this->ok( Db::cast( $t ) );
 	}
 
 	public function create( $req ) {

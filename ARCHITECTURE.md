@@ -78,6 +78,7 @@ All tables are prefixed `{wp_prefix}pcrm_`. Money is `DECIMAL(12,2)` in INR. Dat
 | tasks | Tasks with priority, deadline, assignee, status | assigned_to, related entity |
 | documents | Files (WordPress media) attached to clients/bookings | client_id, booking_id |
 | wa_templates | WhatsApp message templates with {{placeholders}} | studio_id |
+| notifications | Task / follow-up reminders: event, due time, email status, alerted / read (v0.6.0, `PCRM\\Reminders`, cron `pcrm_reminders_tick` every 5 min) | member_id, item_id |
 
 Referential integrity is enforced in the service layer (WordPress' dbDelta does not manage foreign keys); deletes cascade in code inside a transaction.
 

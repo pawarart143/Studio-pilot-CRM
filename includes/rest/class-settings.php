@@ -73,6 +73,8 @@ class Settings extends Base {
 					'rzp_key_id'     => array( 'type' => 'string', 'max' => 60, 'label' => 'Razorpay Key ID' ),
 					'rzp_key_secret' => array( 'type' => 'string', 'max' => 120, 'label' => 'Razorpay Key Secret' ),
 					'rzp_webhook_secret' => array( 'type' => 'string', 'max' => 120, 'label' => 'Razorpay webhook secret' ),
+					'reminder_lead_minutes' => array( 'type' => 'int', 'label' => 'Reminder time' ),
+					'reminder_emails'       => array( 'type' => 'bool' ),
 				),
 				true
 			);
@@ -99,6 +101,12 @@ class Settings extends Base {
 				if ( isset( $s[ $k ] ) ) {
 					$s[ $k ] = trim( $s[ $k ] );
 				}
+			}
+			if ( isset( $s['reminder_lead_minutes'] ) && ( $s['reminder_lead_minutes'] < 5 || $s['reminder_lead_minutes'] > 1440 ) ) {
+				return new \WP_Error( 'validation_failed', 'Reminder time must be between 5 minutes and 24 hours.', array( 'status' => 422, 'errors' => array( 'reminder_lead_minutes' => 'Between 5 and 1440 minutes.' ) ) );
+			}
+			if ( isset( $s['reminder_emails'] ) ) {
+				$s['reminder_emails'] = (bool) $s['reminder_emails'];
 			}
 			if ( isset( $s['gst_enabled'] ) ) {
 				$s['gst_enabled'] = (bool) $s['gst_enabled'];
@@ -171,7 +179,7 @@ class Settings extends Base {
 		}
 		global $wpdb;
 		$sid = $this->sid();
-		foreach ( array( 'activities', 'calls', 'followups', 'quotation_items', 'quotations', 'event_assignments', 'service_team_assignments', 'booking_services', 'booking_deliverables', 'client_portals', 'payment_activity_logs', 'payment_links', 'booking_events', 'installments', 'payments', 'expenses', 'tasks', 'bookings', 'leads', 'clients' ) as $t ) {
+		foreach ( array( 'activities', 'calls', 'followups', 'quotation_items', 'quotations', 'event_assignments', 'service_team_assignments', 'booking_services', 'booking_deliverables', 'client_portals', 'payment_activity_logs', 'payment_links', 'booking_events', 'installments', 'payments', 'expenses', 'tasks', 'bookings', 'leads', 'clients', 'notifications' ) as $t ) {
 			$wpdb->delete( Db::t( $t ), array( 'studio_id' => $sid ) );
 		}
 		$docs = $wpdb->get_col( $wpdb->prepare( 'SELECT attachment_id FROM ' . Db::t( 'documents' ) . ' WHERE studio_id=%d', $sid ) );

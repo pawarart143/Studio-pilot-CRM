@@ -42,6 +42,12 @@ spl_autoload_register(
 );
 
 register_activation_hook( __FILE__, array( 'PCRM\\Installer', 'activate' ) );
-register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );
+register_deactivation_hook(
+	__FILE__,
+	function () {
+		flush_rewrite_rules();
+		wp_clear_scheduled_hook( 'pcrm_reminders_tick' );
+	}
+);
 
 add_action( 'plugins_loaded', array( 'PCRM\\Plugin', 'init' ) );
