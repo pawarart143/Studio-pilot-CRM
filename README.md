@@ -14,6 +14,22 @@ Modules include:
 
 Defaults are INR (₹), India, DD-MM-YYYY, Asia/Kolkata and +91.
 
+## What's new in v0.6.0-dashboard (customizable dashboard)
+
+Update with "Replace current with uploaded". Nothing is removed and the database schema does not change.
+
+- **The default dashboard is unchanged.** Anyone who doesn't customize sees exactly the v0.5.0 dashboard, in the same order, with the same numbers.
+- **Customize** (top right of the dashboard) opens an edit panel. The dashboard behind it previews your changes live:
+  - drag widgets to reorder them (or use the up/down arrows, which also work by keyboard and on phones)
+  - hide a widget, or add one from **More widgets**
+  - pick a date range for widgets where it makes sense (for example 6, 12 or 24 months for revenue, "This financial year" for lead sources, next 7 to 90 days for events)
+  - **Save** keeps the layout; **Cancel** throws the changes away; **Reset to default** puts back the standard layout exactly
+- **Saved per user and per studio.** Your layout doesn't change anyone else's dashboard, and a person in two studios can have a different layout in each. It's stored in WordPress user meta (`pcrm_dashboard_layout_<studio id>`).
+- **Widgets.** Everything that was on the dashboard is now a widget (10 lead KPIs, revenue, pending payments, upcoming events, monthly revenue, lead sources, lead conversion, today's follow-ups, upcoming weddings & events, today's tasks, recent activity). New, off by default: conversion rate, bookings confirmed, payments received, expenses (incl. crew), net (collected − expenses), deliverables in progress, upcoming deliverables, open tasks, leads by stage, income vs expenses, outstanding payments, crew schedule, and task load by person.
+- **Permissions are enforced on the server.** Each widget needs the same permissions as the page its data comes from (for example payment widgets need *payments.view*, expense and net widgets also need *expenses.view*, crew schedule needs *crew.view*, task load needs *tasks.view_all*). A role never receives widgets it can't use: they're left out of the list, dropped from saved layouts, and the widget data endpoint answers 403. The crew schedule widget never includes rates. Deliverables and tasks widgets show only your own items unless your role can see everyone's.
+- Each widget has its own loading, empty and error state, so one failed widget doesn't blank the dashboard.
+- API: `GET/PUT/DELETE /wp-json/pcrm/v1/dashboard/layout` and `GET /wp-json/pcrm/v1/dashboard/widgets/<id>?range=<key>`. `GET /dashboard` is unchanged.
+
 ## What's new in v0.5.0 (Crew Scheduling and Public Enquiry Form)
 
 Update with "Replace current with uploaded". Nothing is removed. The update adds new tables and a few new columns on leads (see "Database changes (v0.5.0)").
