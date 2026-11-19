@@ -13,13 +13,14 @@ import { Link } from 'react-router-dom';
 import EnquirySettings from '@/pages/enquiry/EnquirySettings';
 import PackagesTab from '@/pages/quotations/PackagesTab';
 import { LinesEditor, ScheduleEditor, linesFrom, milestonesFrom, num as qnum, type Milestone } from '@/pages/quotations/parts';
+import GoogleCalendarTab from '@/pages/settings/GoogleCalendarTab';
 
 export default function Settings() {
   const { can, member } = useAuth();
   const admin = can('settings.edit');
   const [f, setF] = useUrlState({ tab: admin ? 'studio' : 'profile' });
   const tabs: [string, string][] = admin
-    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['packages', 'Quote packages'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['whatsapp', 'WhatsApp'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
+    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['packages', 'Quote packages'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['whatsapp', 'WhatsApp'], ['calendar', 'Google Calendar'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
     : [['profile', 'My profile']];
   const tab = tabs.some(([k]) => k === f.tab) ? f.tab : tabs[0][0];
   return (
@@ -36,6 +37,7 @@ export default function Settings() {
           {tab === 'portal' && <PortalsTab />}
           {tab === 'enquiry' && <EnquirySettings />}
           {tab === 'whatsapp' && <WhatsAppTab />}
+          {tab === 'calendar' && <GoogleCalendarTab />}
           {tab === 'payments' && <RazorpayTab />}
           {tab === 'profile' && <ProfileTab key={member.id} />}
           {tab === 'plan' && <PlanTab />}
