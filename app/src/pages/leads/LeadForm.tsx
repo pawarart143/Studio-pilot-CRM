@@ -6,7 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { teamOptions, useTeam, type Lead } from '@/lib/data';
 import { clean, useForm, validate } from '@/lib/form';
-import { fmtDate, toLocalInput } from '@/lib/format';
+import { fmtDate, toLocalInput, eventDays, eventDayCount } from '@/lib/format';
 import { Button, Field, Input, Modal, Select, Textarea, useUi, Badge } from '@/components/ui';
 import { stageTone } from '@/lib/tones';
 
@@ -175,12 +175,13 @@ export function LeadFormModal({ open, onClose, lead, defaults }: { open: boolean
             <Field label="Event date" error={f.errors.event_date}>
               <Input {...b('event_date')} type="date" />
             </Field>
-            <Field label="Event end date" error={f.errors.event_end_date}>
+            <Field label="Event end date" error={f.errors.event_end_date} hint="Leave empty for a single-day event">
               <Input {...b('event_end_date')} type="date" min={f.values.event_date || undefined} />
             </Field>
             <Field label="Duration" error={f.errors.event_duration}>
               <Input {...b('event_duration')} placeholder="e.g. 3 days" />
             </Field>
+            <EventDaysPreview start={f.values.event_date} end={f.values.event_end_date} invalid={!!f.errors.event_end_date} />
             <Field label="Venue name" error={f.errors.venue} className="col-span-2">
               <Input {...b('venue')} />
             </Field>
@@ -220,5 +221,25 @@ export function LeadFormModal({ open, onClose, lead, defaults }: { open: boolean
         <button type="submit" className="hidden" />
       </form>
     </Modal>
+  );
+}
+
+/** Shows every day of the event derived from the start and end dates, so a 3-day event lists 3 dates. */
+function EventDaysPreview({ start, end, invalid }: { start: string; end: string; invalid?: boolean }) {
+  const total = eventDayCount(start, end);
+  if (!start || invalid) return null;
+  const days = eventDays(start, end, 60);
+  return (
+    <div className="col-span-2 rounded-lg border border-line bg-subtle/40 p-3 sm:col-span-3">
+      <p className="text-xs font-medium">
+        {total > 1 ? `Event dates \u00b7 ${total} days` : 'Event date \u00b7 single day'}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {days.map((d, i) => (
+          <Badge key={d}>{total > 1 ? `Day ${i + 1} \u00b7 ${fmtDate(d)}` : fmtDate(d)}</Badge>
+        ))}
+        {total > days.length && <Badge>+{total - days.length} more</Badge>}
+      </div>
+    </div>
   );
 }

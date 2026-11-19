@@ -35,6 +35,33 @@ export const fmtTime = (t?: string | null) => (t ? dayjs('2000-01-01 ' + t).form
 export const fromNow = (d?: string | null) => (d ? dayjs(d).fromNow() : '');
 export const monthLabel = (ym: string) => dayjs(ym + '-01').format('MMM YY');
 
+/**
+ * Every individual day of an event, start through end (inclusive).
+ * A single-day event (no end date, or the same end date) returns one date.
+ * `max` caps the list so a typo in the end date can never render thousands of rows;
+ * use eventDayCount() for the real number of days.
+ */
+export function eventDays(start?: string | null, end?: string | null, max = 60): string[] {
+  if (!start) return [];
+  const s = dayjs(start);
+  if (!s.isValid()) return [];
+  let e = end ? dayjs(end) : s;
+  if (!e.isValid() || e.isBefore(s, 'day')) e = s;
+  const out: string[] = [];
+  for (let d = s; !d.isAfter(e, 'day') && out.length < max; d = d.add(1, 'day')) out.push(d.format('YYYY-MM-DD'));
+  return out;
+}
+
+/** How many days the event spans (1 for a single-day event, 0 when no date is set). */
+export function eventDayCount(start?: string | null, end?: string | null) {
+  if (!start) return 0;
+  const s = dayjs(start);
+  if (!s.isValid()) return 0;
+  const e = end ? dayjs(end) : s;
+  if (!e.isValid() || e.isBefore(s, 'day')) return 1;
+  return e.startOf('day').diff(s.startOf('day'), 'day') + 1;
+}
+
 export const today = () => dayjs().format('YYYY-MM-DD');
 export const nowLocal = () => dayjs().format('YYYY-MM-DDTHH:mm');
 
