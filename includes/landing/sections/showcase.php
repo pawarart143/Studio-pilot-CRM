@@ -7,7 +7,7 @@ $tabs = array(
 	'dashboard' => array( 'home', 'Dashboard', 'Your studio at a glance: leads, bookings, revenue, dues and today\'s work.' ),
 	'leads'     => array( 'contact', 'Leads', 'Search, filter and sort every enquiry. Import your Excel sheet or add a new lead in seconds.' ),
 	'pipeline'  => array( 'columns', 'Pipeline', 'Drag leads across stages from first call to booking confirmed.' ),
-	'whatsapp'  => array( 'message', 'WhatsApp', 'Ready templates filled with each client\'s details, and a log of every message sent.' ),
+	'whatsapp'  => array( 'message', 'WhatsApp', 'Ready templates filled with each client\'s details (Professional and Business), and a log of every message sent.' ),
 	'calendar'  => array( 'calendar', 'Calendar', 'Every event, venue and crew assignment on one calendar.' ),
 	'payments'  => array( 'card', 'Payments', 'Advances, installments, overdue dues, receipts and expenses in one place.' ),
 );

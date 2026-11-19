@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Check, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useForm, validate } from '@/lib/form';
@@ -607,29 +607,16 @@ function ProfileTab() {
 
 /* ---------- Plan ---------- */
 function PlanTab() {
-  const { studio, config } = useAuth();
-  const plans = Object.entries(config.plans);
-  const lim = (n: number) => (n > 0 ? String(n) : 'Unlimited');
+  const { studio } = useAuth();
+  const b = studio.billing;
   return (
-    <div>
+    <div className="max-w-xl">
       <p className="text-sm">
-        You are on the <b>{studio.plan_info.label}</b> plan{studio.plan_expires_at ? `, valid until ${fmtDate(studio.plan_expires_at)}` : ''}.
+        You are on the <b>{b?.label || studio.plan_info.label}</b> plan
+        {b?.state === 'trial' ? `, free trial with ${b.days_left} ${b.days_left === 1 ? 'day' : 'days'} left` : b?.ends_at ? `, until ${fmtDate(b.ends_at)}` : ''}.
       </p>
-      <p className="mt-1 text-sm text-muted">Online plan payments are not connected yet. To change your plan, contact the platform administrator, who can switch it from the admin panel.</p>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {plans.map(([k, p]) => (
-          <div key={k} className={clsx('rounded-xl border p-4', k === studio.plan ? 'border-accent ring-1 ring-accent' : 'border-line')}>
-            <div className="flex items-center justify-between"><p className="font-semibold">{p.label}</p>{k === studio.plan && <Badge tone="accent">Current</Badge>}</div>
-            <p className="tabular mt-1 text-2xl font-semibold">{p.price ? inr(p.price) : 'Free'}<span className="text-xs font-normal text-muted">{p.price ? ' / month' : ''}</span></p>
-            <ul className="mt-3 space-y-1.5 text-sm">
-              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600" />{lim(p.members)} team logins (crew without login unlimited)</li>
-              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600" />{lim(p.leads_per_month)} new leads / month</li>
-              <li className={clsx('flex gap-2', !p.reports && 'text-faint line-through')}><Check className="h-4 w-4 text-emerald-600" />Reports</li>
-              <li className={clsx('flex gap-2', !p.whatsapp_api && 'text-faint line-through')}><Check className="h-4 w-4 text-emerald-600" />WhatsApp Cloud API sending</li>
-            </ul>
-          </div>
-        ))}
-      </div>
+      <p className="mt-1 text-sm text-muted">See usage, upgrade, pay online and download your billing history on the Billing page.</p>
+      <Link to="/billing" className="mt-4 inline-flex h-9 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white shadow-sm hover:bg-accent/90 dark:text-slate-950">Open Billing & plan</Link>
     </div>
   );
 }

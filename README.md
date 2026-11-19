@@ -11,8 +11,94 @@ Modules include:
 - crew scheduling for freelancers (v0.5.0)
 - public enquiry form that creates leads (v0.5.0)
 - WhatsApp sharing and settings
+- subscription billing: Starter trial, Professional and Business plans with Razorpay Subscriptions (v0.6.0)
 
 Defaults are INR (₹), India, DD-MM-YYYY, Asia/Kolkata and +91.
+
+## What's new in v0.6.0-teamaccess (team sign-in and business access)
+
+Update with "Replace current with uploaded". No database changes.
+
+**Team sign-in fixes**
+- **Password always known.** When you add a member with "Let them sign in" and leave the password blank, ShootPilot now shows the generated password once after saving, with Copy and WhatsApp share. Before, the password was only in the invite email, so if the server could not send email the member could never sign in.
+- **Set a new password.** Team → Edit member now has "Set a new password" for members who already have a login. Logins that the person also uses for another studio, WordPress administrators, and the owner's login (unless you are the owner) can't be changed from here.
+- **Email change keeps the login working.** Changing a member's email now changes the email they sign in with too.
+- **No more office lock-out.** Sign-in used to count every attempt, including successful ones, from one IP address, so a studio sharing one internet connection was blocked after 10 sign-ins in 15 minutes. Now only wrong passwords count (20 per IP, 8 per account, per 15 minutes).
+- **Deactivated members** see "Your team access has been turned off" instead of the "Set up your studio" page.
+
+**Business access is owner and admin only**
+- Sales, production manager, photographer, cinematographer, editor and album designer no longer get Payments & Expenses, Reports, Team, Settings (studio, quotes and invoices, services, portal, enquiry form, WhatsApp, online payments, plan, data) or the plan card. The whole Business section is gone from their sidebar and opening those pages shows "You don't have access".
+- The server refuses those APIs with 403 for team roles, money is removed from bookings, clients and the dashboard, and `Permissions::business_permissions()` lists the keys that team roles can never get.
+- Production managers still see teammates' phone numbers and the availability check when assigning shoots. Sales no longer see payment status.
+- Team login limits come only from the billing plans (Starter 1, Professional 2, Business unlimited). This update adds no limit of its own. Team roles still see the trial or plan-ended banner, so they know why saving is paused.
+
+## What's new in v0.6.0-billing (Subscription billing and plans)
+
+Update with "Replace current with uploaded". Nothing is removed. The update adds four tables and four columns on studios (see "Database changes (billing)").
+
+### Plans
+
+| | Starter | Professional | Business |
+|---|---|---|---|
+| Price | Free for 15 days | ₹599/month or ₹4,999/year | ₹999/month or ₹7,999/year |
+| Team logins | 1 | 2 | Unlimited |
+| New leads a month | 50 | 250 | Unlimited |
+| Leads, pipeline, calling, follow-ups, quotations (GST, PDF), bookings, calendar, tasks, payments, receipts, expenses, reports | ✔ | ✔ | ✔ |
+| WhatsApp share with ready templates | – | ✔ | ✔ |
+| Razorpay payment links (studio's own account) | – | ✔ | ✔ |
+
+- Plans live in the database (`pcrm_plans`). The super admin can change names, prices, limits, trial days and features in **Super Admin → Plans**. The homepage and the Billing page read from there.
+- Crew Scheduling, the enquiry form, the client portal, deliverables and the team directory stay on every plan. Crew and team members **without a login** are unlimited.
+- Platform support logins (super admin) don't count as team logins.
+
+### Limits are enforced on the server
+
+- **New leads a month** counts every lead created this calendar month (Asia/Kolkata), from the form, import, the public enquiry form or the API. Over the limit, the API answers HTTP 402 with a clear message; the enquiry form keeps the submission "on hold" (as before) so nothing is lost.
+- **Team logins** are checked when you give a member a login and when you turn a deactivated member with a login back on.
+- **WhatsApp templates** (`whatsapp/render`, `whatsapp/send`, creating or editing templates) and **creating Razorpay payment links** answer 402 on Starter. Plain WhatsApp chat buttons still work, and payment links made earlier can still be checked, cancelled and paid (webhook), so no client payment is lost.
+- The app shows an **Upgrade your plan** box with the server's message whenever this happens.
+
+### When the trial or a paid plan ends
+
+Default: **read-only**. The studio can sign in, view everything and export, but adding, editing and deleting answer 402 until they choose a plan. Billing, sign-in and profile keep working. Data is never deleted.
+
+To make Starter free forever instead, set **Super Admin → Subscription billing → "When a trial or paid plan ends" → Keep working on Starter limits** (option `pcrm_billing_after_expiry` = `starter_limits`). No code change needed.
+
+A paid plan keeps working for 3 days after its period ends while Razorpay retries a renewal (state "Payment due").
+
+### Billing page (`/crm/billing`, owners and admins)
+
+Current plan, trial days left, renewal date, usage meters (team logins, new leads this month), the three plans with a monthly/yearly switch, **Upgrade** (Razorpay Checkout), **Turn off auto-renew**, and billing history. Other roles see a banner when the trial is ending or has ended.
+
+### Razorpay Subscriptions (ShootPilot's own account)
+
+These are the **platform** keys that collect ShootPilot's subscription money. They are completely separate from each studio's keys in Settings → Online payments (which collect the studio's client payments) and from its webhook secret.
+
+1. Razorpay Dashboard → switch to **Test Mode** → Account & Settings → API Keys → Generate key.
+2. ShootPilot → **Super Admin → Subscription billing**: paste Key ID, Key Secret and choose a webhook secret (12+ characters). Or put them in wp-config.php: `PCRM_BILLING_KEY_ID`, `PCRM_BILLING_KEY_SECRET`, `PCRM_BILLING_WEBHOOK_SECRET`.
+3. Razorpay → Webhooks → Add: URL `https://your-site.com/wp-json/pcrm/v1/billing/webhook`, the same secret, events `subscription.authenticated`, `subscription.activated`, `subscription.charged`, `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`, `subscription.paused`, `subscription.resumed`.
+4. Upgrade a test studio from its Billing page and pay with a Razorpay test card or UPI `success@razorpay`. The plan activates right after checkout (signature checked on the server) and again from the webhook; whichever comes first wins.
+5. Repeat with live keys (`rzp_live_…`).
+
+How it works: the Razorpay plan (₹ amount, monthly/yearly) is created automatically on the first checkout and remembered per key and price. Each charge (`subscription.charged`) extends "paid until" to Razorpay's `current_end` and adds a row to billing history. Webhooks are signature-checked, de-duplicated by event id, ignored for subscriptions this site didn't create, and can never shorten paid time. Switching plan starts the new subscription right away and cancels the old one (no proration). Turning off auto-renew cancels at the end of the paid period.
+
+### Database changes (billing)
+
+Versioned with its own option `pcrm_billing_db_version` (not `PCRM_DB_VERSION`).
+
+| Table / column | Purpose |
+|---|---|
+| `pcrm_plans` | Plan definitions (price monthly/yearly, trial days, logins, leads, features) |
+| `pcrm_subscriptions` | Each Razorpay subscription a studio starts (status, cycle, current period, mode test/live) |
+| `pcrm_billing_payments` | Subscription payments (billing history) |
+| `pcrm_billing_events` | Webhook events already handled |
+| `pcrm_studios`: `trial_ends_at`, `billing_cycle`, `billing_status`, `subscription_id` | Trial end and the subscription in force |
+
+**Existing studios on update:** Free → Starter with a fresh 15-day trial from the update day; old paid Starter → Professional (same expiry); Enterprise → Business; Professional stays. A paid plan that had already expired gets a fresh 15-day trial instead of becoming read-only at once.
+
+### Homepage
+
+Pricing shows the three plans from the database with the monthly/yearly switch (yearly shows the per-month price and the yearly total). A new "Studio operations" section covers Crew Scheduling, the public enquiry form, the PIN-protected client portal, the team directory with service-wise crew, deliverables and admin-controlled payments. FAQ answers were updated for the trial, plans, client portal and enquiry form.
 
 ## What's new in v0.5.0 (Crew Scheduling and Public Enquiry Form)
 
@@ -119,7 +205,7 @@ ShootPilot includes a public marketing homepage, served by the plugin outside yo
 - It is always available at `https://your-site.com/shootpilot/`.
 - All buttons link to the real CRM: **Start Free / Get Started** → `/crm/register`, **Login** → `/crm/login`. Signed-in users see **Open dashboard** → `/crm/`.
 - On the same wp-admin page you can set the Contact email, About and Terms URLs, and Instagram, Facebook and YouTube links. Footer links without a URL show "Soon". Privacy Policy uses Settings → Privacy.
-- **Pricing is placeholder.** The amounts come from `includes/class-plans.php` (Starter, Professional, and Enterprise shown as "Business"). Yearly = 10 × monthly. Change them there, or with the `pcrm_landing_pricing` filter.
+- **Pricing** comes from the plans table (Super Admin → Plans). You can also change the cards with the `pcrm_landing_pricing` filter.
 - **Testimonials are placeholders**, clearly labelled on the page. Replace them in `includes/landing/sections/testimonials.php` or with the `pcrm_landing_testimonials` filter, only with real quotes you have permission to use.
 - Files: `includes/class-landing.php`, `includes/landing/` (one partial per section, product previews in `mock/`), `assets/landing/landing.css` and `landing.js`. No build step.
 
@@ -160,7 +246,7 @@ A Google account whose email already exists signs in to that account. A new emai
 
 ## Razorpay (online payments from clients)
 
-Each studio connects **its own** Razorpay account, so money goes straight to the studio.
+Professional and Business plans. Each studio connects **its own** Razorpay account, so money goes straight to the studio.
 
 1. In the Razorpay Dashboard, go to Account & Settings → **API Keys** and generate a key.
 2. In ShootPilot, go to Settings → **Online payments** and paste the Key ID and Key Secret. Choose a webhook secret (any strong password) and save.
@@ -175,8 +261,8 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 
 ## WhatsApp
 
-- **Without any setup:** every WhatsApp button opens WhatsApp (phone or WhatsApp Web) with the message already typed. You press send. This works on every plan.
-- **WhatsApp Cloud API (Professional and Enterprise plans):** ShootPilot can send directly. Settings → WhatsApp → "How to get these from Meta" lists the steps:
+- **Without any setup:** on Professional and Business, WhatsApp buttons open WhatsApp (phone or WhatsApp Web) with the message already typed from a template. You press send. On Starter, chat buttons open WhatsApp without a template.
+- **WhatsApp Cloud API (Professional and Business plans):** ShootPilot can send directly. Settings → WhatsApp → "How to get these from Meta" lists the steps:
   1. Create a Business app on developers.facebook.com and add the WhatsApp product.
   2. Add and verify a business number. This number can't stay on the normal WhatsApp app.
   3. Copy the Phone Number ID.
@@ -200,7 +286,7 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 | WhatsApp Cloud API sending | Built, **not tested against Meta** (no credentials yet) |
 | Razorpay payment links and webhook | Built and tested against simulated Razorpay responses, including webhook signature checks and duplicate webhooks. **Not yet tested with real Razorpay keys.** Try it with Test Mode keys first. |
 | Google sign-in | Built and tested against simulated Google responses. **Not yet tested with a real Google client ID.** |
-| Plan billing for studios | Not included. The super admin sets plans by hand. |
+| Subscription billing (Razorpay Subscriptions, v0.6.0) | Built. Tested against a simulated Razorpay API and signed test webhooks (88 API checks) and in the browser with a simulated Checkout. **Not yet tested against real Razorpay test keys.** |
 | Email (reset, invites) | Uses WordPress `wp_mail`, so it needs working email on the server |
 
 ## Time zone
@@ -209,12 +295,7 @@ Dates such as "today" use the studio's time zone (Asia/Kolkata by default), even
 
 ## Plans
 
-Plans are Free, Starter, Professional and Enterprise. Their limits are in `includes/class-plans.php`:
-- team logins
-- leads per month
-- WhatsApp Cloud API
-
-Crew members without a login are unlimited. When a plan expires, the studio falls back to Free limits.
+Starter (15-day trial), Professional and Business. See "What's new in v0.6.0-billing" above. Limits: team logins, new leads a month, and the features WhatsApp templates, Razorpay payment links and WhatsApp Cloud API.
 
 ## WP-CLI
 

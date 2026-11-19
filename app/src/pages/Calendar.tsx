@@ -67,7 +67,7 @@ export default function CalendarPage() {
         subtitle="Every shoot across your team. Dashed cards are leads that haven't booked yet."
         actions={
           <>
-            {can('team.view') && <Select value={f.member_id} onChange={(e) => setF({ member_id: e.target.value })} options={teamOptions(team.data)} placeholder="Whole team" className="w-auto" />}
+            {(can('team.view') || can('bookings.view_all')) && <Select value={f.member_id} onChange={(e) => setF({ member_id: e.target.value })} options={teamOptions(team.data)} placeholder="Whole team" className="w-auto" />}
             <Select value={f.event_type} onChange={(e) => setF({ event_type: e.target.value })} options={config.event_types} placeholder="All events" className="w-auto" />
             {can('leads.view') && <Toggle checked={f.leads === '1'} onChange={(v) => setF({ leads: v ? '1' : '0' })} label="Tentative leads" />}
           </>

@@ -8,7 +8,7 @@ $who = array(
 	array( 'camera', 'Pre-Wedding Photographers', 'Turn Instagram enquiries into booked shoots fast, with quick quotations, location details and reminders before travel.' ),
 	array( 'party', 'Event Photography Businesses', 'Handle birthdays, corporate events and parties at volume, with a daily call list and a calendar that stops double bookings.' ),
 	array( 'building', 'Commercial Photography Studios', 'Quote product, fashion and brand shoots with GST-ready PDFs and track every installment against the project.' ),
-	array( 'user', 'Freelance Photographers', 'Start on the Free plan and replace your notebook and spreadsheet with one simple dashboard on your phone.' ),
+	array( 'user', 'Freelance Photographers', 'Start with a 15-day free trial and replace your notebook and spreadsheet with one simple dashboard on your phone.' ),
 	array( 'layers', 'Photography Agencies', 'Run several teams with role-based access, so sales, crew and editors each see exactly what they need.' ),
 );
 ?>
