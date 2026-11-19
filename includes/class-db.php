@@ -83,7 +83,11 @@ class Db {
 		if ( false === $ok ) {
 			return new \WP_Error( 'db_error', 'Could not save. ' . $wpdb->last_error, array( 'status' => 500 ) );
 		}
-		return (int) $wpdb->insert_id;
+		$id = (int) $wpdb->insert_id;
+		if ( in_array( $table, self::watched(), true ) ) {
+			do_action( 'pcrm_inserted', $table, $id, $data, (int) $data['studio_id'] );
+		}
+		return $id;
 	}
 
 	public static function update( $table, $id, array $data, $studio_id = null ) {
@@ -97,9 +101,14 @@ class Db {
 		if ( ! $data ) {
 			return true;
 		}
-		$ok = $wpdb->update( self::t( $table ), $data, array( 'id' => (int) $id, 'studio_id' => self::sid( $studio_id ) ) );
+		$watch = in_array( $table, self::watched(), true );
+		$old   = $watch ? self::find( $table, $id, $studio_id ) : null;
+		$ok    = $wpdb->update( self::t( $table ), $data, array( 'id' => (int) $id, 'studio_id' => self::sid( $studio_id ) ) );
 		if ( false === $ok ) {
 			return new \WP_Error( 'db_error', 'Could not save. ' . $wpdb->last_error, array( 'status' => 500 ) );
+		}
+		if ( $watch && $old ) {
+			do_action( 'pcrm_updated', $table, (int) $id, $old, $data, self::sid( $studio_id ) );
 		}
 		return true;
 	}
@@ -113,6 +122,11 @@ class Db {
 		global $wpdb;
 		$where['studio_id'] = self::sid( $studio_id );
 		return $wpdb->delete( self::t( $table ), $where );
+	}
+
+	/** Tables whose writes fire pcrm_inserted / pcrm_updated (reminders listen). */
+	public static function watched() {
+		return (array) apply_filters( 'pcrm_watched_tables', array() );
 	}
 
 	public static function columns( $table ) {

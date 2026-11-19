@@ -134,6 +134,8 @@ class Seeder {
 		if ( $has > 0 ) {
 			return new \WP_Error( 'has_data', 'Sample data can only be loaded into an empty studio. Reset the studio data first.', array( 'status' => 409 ) );
 		}
+		// Sample tasks and follow-ups must not email the team.
+		Reminders::$mute = true;
 		mt_srand( 20261117 );
 		$now_ts = Db::ts();
 		$d      = function ( $days, $fmt = 'Y-m-d' ) use ( $now_ts ) {

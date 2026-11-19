@@ -67,7 +67,7 @@ class Installer {
 	}
 
 	public static function tables() {
-		return array( 'studios', 'members', 'clients', 'leads', 'activities', 'calls', 'followups', 'services', 'quotations', 'quotation_items', 'bookings', 'booking_events', 'event_assignments', 'installments', 'payments', 'expenses', 'tasks', 'documents', 'wa_templates', 'payment_links', 'payment_activity_logs', 'booking_services', 'service_team_assignments', 'deliverable_templates', 'deliverable_template_items', 'booking_deliverables', 'client_portals', 'crew_members', 'crew_schedules', 'crew_schedule_assignments', 'crew_expenses', 'crew_expense_payments', 'public_enquiry_forms', 'enquiry_form_fields', 'enquiry_submissions', 'audit_logs' );
+		return array( 'studios', 'members', 'clients', 'leads', 'activities', 'calls', 'followups', 'services', 'quotations', 'quotation_items', 'bookings', 'booking_events', 'event_assignments', 'installments', 'payments', 'expenses', 'tasks', 'documents', 'wa_templates', 'payment_links', 'payment_activity_logs', 'booking_services', 'service_team_assignments', 'deliverable_templates', 'deliverable_template_items', 'booking_deliverables', 'client_portals', 'crew_members', 'crew_schedules', 'crew_schedule_assignments', 'crew_expenses', 'crew_expense_payments', 'public_enquiry_forms', 'enquiry_form_fields', 'enquiry_submissions', 'audit_logs', 'notifications' );
 	}
 
 	public static function install() {
