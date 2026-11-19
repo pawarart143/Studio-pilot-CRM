@@ -8,13 +8,13 @@ import { useAuth } from '@/lib/auth';
 import { useForm, validate } from '@/lib/form';
 import { useUrlState } from '@/lib/hooks';
 import { availabilityTone } from '@/lib/tones';
-import { dayjs, fmtTime, inrShort, phoneDisplay, telLink } from '@/lib/format';
+import { dayjs, fmtTime, inrShort, phoneDisplay, telLink, waLink } from '@/lib/format';
 import { Avatar, Badge, Button, Card, Checkbox, EmptyState, ErrorState, Field, Input, Modal, PageHeader, SearchInput, Select, TableSkeleton, Tabs, Textarea, useUi } from '@/components/ui';
 
 const ROLE_ACCESS: Record<string, string> = {
-  admin: 'everything, including payments, reports and settings',
-  sales: 'all leads, calling, quotations, bookings and payment status (cannot record payments)',
-  production_manager: 'all bookings, team assignments, calendar and every task (no money)',
+  admin: 'everything, including payments, reports, team and settings',
+  sales: 'all leads, calling, quotations and bookings (no payments, reports, team or settings)',
+  production_manager: 'all bookings, team assignments, crew, calendar and every task (no payments, reports or settings)',
 };
 const COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777', '#2563eb', '#65a30d'];
 
@@ -226,7 +226,7 @@ export default function Team() {
 }
 
 export function MemberModal({ member, onClose }: { member: any; onClose: () => void }) {
-  const { config, refresh } = useAuth();
+  const { config, refresh, member: me } = useAuth();
   const { toast } = useUi();
   const qc = useQueryClient();
   const isNew = member && !member.id;
@@ -235,8 +235,10 @@ export function MemberModal({ member, onClose }: { member: any; onClose: () => v
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [creds, setCreds] = useState<{ name: string; email: string; password: string; phone?: string } | null>(null);
   useEffect(() => {
     if (!member) return;
+    setCreds(null);
     f.setValues(
       member.id
         ? { ...blank, name: member.name, email: member.email || '', phone: member.phone || '', role: member.role, status: member.status, color: member.color || COLORS[0], team_role: member.team_role || '', specialization: member.specialization || '', city: member.city || '', availability: member.availability || 'available', joining_date: member.joining_date || '', notes: member.notes || '' }
@@ -247,12 +249,13 @@ export function MemberModal({ member, onClose }: { member: any; onClose: () => v
     f.setErrors({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [member]);
-  const hasLogin = member?.user_id;
+  const hasLogin = member?.user_id || member?.has_login;
+  const canSetPassword = hasLogin && (member?.role !== 'owner' || member?.id === me.id);
   const roles = Object.fromEntries(Object.entries(config.roles).filter(([k]) => k !== 'owner'));
   const save = async () => {
     const v = f.values;
     const e = validate(v, { name: ['required'], email: v.create_login ? ['required', 'email'] : ['email'], phone: ['phone'] }, { email: 'Email' });
-    if (v.create_login && v.password && v.password.length < 8) e.password = 'At least 8 characters.';
+    if ((v.create_login || hasLogin) && v.password && v.password.length < 8) e.password = 'At least 8 characters.';
     f.setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
@@ -260,7 +263,7 @@ export function MemberModal({ member, onClose }: { member: any; onClose: () => v
     if (Object.keys(e).length) return f.setErrors(e);
     const body: any = { ...v, email: v.email || null, phone: v.phone || null, team_role: v.team_role || null, joining_date: v.joining_date || null };
     if (member.role === 'owner') delete body.role;
-    if (!v.create_login) delete body.password;
+    if (!v.create_login && !(canSetPassword && v.password)) delete body.password;
     try {
       const r = isNew ? await api.post('team', body) : await api.put(`team/${member.id}`, body);
       if (photo) {
@@ -275,9 +278,17 @@ export function MemberModal({ member, onClose }: { member: any; onClose: () => v
         await api.del(`team/${member.id}/photo`).catch(() => undefined);
       }
       const login = r.login;
-      toast(isNew ? `${v.name} added${login?.created ? (login.mailed ? ' · login details emailed' : ' · login created (email could not be sent — share the password yourself)') : login?.linked ? ' · linked to existing account' : ''}` : 'Member updated');
       qc.invalidateQueries({ queryKey: ['team'] });
       refresh();
+      const shared = login?.created ? (login.password || v.password) : login?.password_set ? v.password : '';
+      if (shared) {
+        // Show the sign-in details so the admin can share them, even when email did not go out.
+        toast(login?.password_set ? 'New password saved' : login.mailed ? `${v.name} added · login details emailed` : `${v.name} added · email could not be sent, share the details below`);
+        setCreds({ name: v.name, email: r.email || v.email, password: shared, phone: r.phone || v.phone });
+        setBusy(false);
+        return;
+      }
+      toast(isNew ? `${v.name} added${login?.linked ? ' · linked to existing account' : ''}` : 'Member updated');
       onClose();
     } catch (err) {
       f.fromError(err);
@@ -285,6 +296,26 @@ export function MemberModal({ member, onClose }: { member: any; onClose: () => v
     }
     setBusy(false);
   };
+  if (creds) {
+    const loginUrl = `${window.location.origin}${window.PCRM.base}/login`;
+    const text = `Hi ${creds.name}, your ShootPilot login:\n${loginUrl}\nEmail: ${creds.email}\nPassword: ${creds.password}\nPlease change it after signing in (Settings → My profile).`;
+    return (
+      <Modal open={!!member} onClose={onClose} title="Sign-in details" subtitle="Share these with the member. The password is shown only now."
+        footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
+        <div className="space-y-3">
+          <dl className="grid grid-cols-[6rem_1fr] gap-y-2 rounded-lg border border-line bg-subtle/50 p-3 text-sm">
+            <dt className="text-muted">Sign in at</dt><dd className="break-all">{loginUrl}</dd>
+            <dt className="text-muted">Email</dt><dd className="break-all">{creds.email}</dd>
+            <dt className="text-muted">Password</dt><dd className="font-mono" data-testid="login-password">{creds.password}</dd>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => navigator.clipboard?.writeText(text).then(() => toast('Copied'))}>Copy details</Button>
+            {creds.phone && <a className="inline-flex h-8 items-center rounded-lg border border-line bg-surface px-3 text-xs font-medium shadow-sm hover:bg-subtle" href={waLink(creds.phone, text)} target="_blank" rel="noreferrer">Share on WhatsApp</a>}
+          </div>
+        </div>
+      </Modal>
+    );
+  }
   return (
     <Modal
       open={!!member}
@@ -334,7 +365,7 @@ export function MemberModal({ member, onClose }: { member: any; onClose: () => v
             <Checkbox checked={f.values.create_login} onChange={(v) => f.set('create_login', v)} label={<span className="flex items-center gap-1.5"><KeyRound className="h-4 w-4 text-accent-ink" />Let them sign in to the CRM</span>} />
             {f.values.create_login && (
               <div className="mt-3">
-                <Field label="Password (optional)" error={f.errors.password} hint="Leave blank to email them a link to set their own password.">
+                <Field label="Password (optional)" error={f.errors.password} hint="Leave blank and ShootPilot creates one. You will see it after saving, so you can share it.">
                   <Input type="text" {...f.bind('password')} autoComplete="new-password" />
                 </Field>
                 <p className="mt-2 text-xs text-muted">They will only see what their role allows: {ROLE_ACCESS[f.values.role] || 'their assigned shoots, calendar and tasks'}.</p>
@@ -342,7 +373,16 @@ export function MemberModal({ member, onClose }: { member: any; onClose: () => v
             )}
           </div>
         )}
-        {hasLogin && <p className="text-xs text-muted sm:col-span-2">This member can sign in with their email.</p>}
+        {hasLogin && (
+          <div className="rounded-lg border border-line bg-subtle/50 p-3 sm:col-span-2">
+            <p className="flex items-center gap-1.5 text-sm font-medium"><KeyRound className="h-4 w-4 text-accent-ink" />Can sign in with {member?.email || 'their email'}</p>
+            {canSetPassword && (
+              <Field label="Set a new password" error={f.errors.password} hint="Use this if they forgot it or never got the invite email. Leave blank to keep the current one." className="mt-3">
+                <Input type="text" {...f.bind('password')} autoComplete="new-password" placeholder="At least 8 characters" />
+              </Field>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );

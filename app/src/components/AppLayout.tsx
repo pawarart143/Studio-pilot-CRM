@@ -113,7 +113,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <Shield /> Super Admin
           </NavLink>
         )}
-        <PlanBox />
+        {can('settings.edit') && <PlanBox />}
       </div>
     </div>
   );

@@ -148,6 +148,23 @@ Update with "Replace current with uploaded". Nothing is removed. One new table i
 
 Preferences are user meta `pcrm_notify_prefs`. Studio settings gain `reminder_lead_minutes` (30) and `reminder_emails` (on).
 
+## What's new in v0.6.0-teamaccess (team sign-in and business access)
+
+Update with "Replace current with uploaded". No database changes.
+
+**Team sign-in fixes**
+- **Password always known.** When you add a member with "Let them sign in" and leave the password blank, ShootPilot now shows the generated password once after saving, with Copy and WhatsApp share. Before, the password was only in the invite email, so if the server could not send email the member could never sign in.
+- **Set a new password.** Team → Edit member now has "Set a new password" for members who already have a login. Logins that the person also uses for another studio, WordPress administrators, and the owner's login (unless you are the owner) can't be changed from here.
+- **Email change keeps the login working.** Changing a member's email now changes the email they sign in with too.
+- **No more office lock-out.** Sign-in used to count every attempt, including successful ones, from one IP address, so a studio sharing one internet connection was blocked after 10 sign-ins in 15 minutes. Now only wrong passwords count (20 per IP, 8 per account, per 15 minutes).
+- **Deactivated members** see "Your team access has been turned off" instead of the "Set up your studio" page.
+
+**Business access is owner and admin only**
+- Sales, production manager, photographer, cinematographer, editor and album designer no longer get Payments & Expenses, Reports, Team, Settings (studio, quotes and invoices, services, portal, enquiry form, WhatsApp, online payments, plan, data) or the plan card. The whole Business section is gone from their sidebar and opening those pages shows "You don't have access".
+- The server refuses those APIs with 403 for team roles, money is removed from bookings, clients and the dashboard, and `Permissions::business_permissions()` lists the keys that team roles can never get.
+- Production managers still see teammates' phone numbers and the availability check when assigning shoots. Sales no longer see payment status.
+- Team login limits come only from the billing plans (Starter 1, Professional 2, Business unlimited). This update adds no limit of its own. Team roles still see the trial or plan-ended banner, so they know why saving is paused.
+
 ## What's new in v0.6.0-billing (Subscription billing and plans)
 
 Update with "Replace current with uploaded". Nothing is removed. The update adds four tables and four columns on studios (see "Database changes (billing)").
