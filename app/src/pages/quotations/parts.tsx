@@ -364,7 +364,7 @@ export function QuotePreview({ d }: { d: PreviewData }) {
                       <p className="font-medium">{it.name || 'Untitled item'}</p>
                       {it.description && <p className="text-xs text-muted">{it.description}</p>}
                     </div>
-                    <span className="tabular shrink-0 text-xs text-muted">{num(it.qty)}{it.unit ? ' ' + it.unit : ''}{d.show_prices ? ` × ${inr(num(it.rate))}` : ''}</span>
+                    <span className="tabular shrink-0 text-xs text-muted">{num(it.qty)}{it.unit ? ' ' + it.unit + (num(it.qty) > 1 ? 's' : '') : ''}{d.show_prices ? ` × ${inr(num(it.rate))}` : ''}</span>
                     {d.show_prices && <span className="tabular w-24 shrink-0 text-right font-medium">{inr(r2(num(it.qty) * num(it.rate)))}</span>}
                   </div>
                 ))}
