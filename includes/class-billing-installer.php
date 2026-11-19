@@ -111,14 +111,15 @@ class Billing_Installer {
 		}
 
 		// Studio columns. Added with ALTER (not by editing the shared studios CREATE TABLE).
+		// No AFTER clause: column order does not matter and plain ADD COLUMN works on every database driver.
 		$s    = Installer::table( 'studios' );
 		$cols = $wpdb->get_col( "SHOW COLUMNS FROM $s" ); // phpcs:ignore
 		if ( $cols ) {
 			$add = array(
-				'trial_ends_at'   => 'DATE NULL AFTER plan_expires_at',
-				'billing_cycle'   => 'VARCHAR(10) NULL AFTER trial_ends_at',
-				'billing_status'  => 'VARCHAR(20) NULL AFTER billing_cycle',
-				'subscription_id' => 'BIGINT UNSIGNED NULL AFTER billing_status',
+				'trial_ends_at'   => 'DATE NULL',
+				'billing_cycle'   => 'VARCHAR(10) NULL',
+				'billing_status'  => 'VARCHAR(20) NULL',
+				'subscription_id' => 'BIGINT UNSIGNED NULL',
 			);
 			foreach ( $add as $col => $def ) {
 				if ( ! in_array( $col, $cols, true ) ) {
@@ -129,6 +130,11 @@ class Billing_Installer {
 		}
 
 		self::seed_plans();
+		// Only mark the migration done once the studio columns really exist, so a failed ALTER is retried on the next load.
+		$cols = $wpdb->get_col( "SHOW COLUMNS FROM $s" ); // phpcs:ignore
+		if ( $cols && array_diff( array( 'trial_ends_at', 'billing_cycle', 'billing_status', 'subscription_id' ), $cols ) ) {
+			return;
+		}
 		update_option( 'pcrm_billing_db_version', self::VERSION );
 		Plans::flush();
 		self::migrate_studios();
