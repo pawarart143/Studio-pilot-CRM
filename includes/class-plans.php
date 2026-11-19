@@ -269,6 +269,43 @@ class Plans {
 	}
 
 	/**
+	 * "Upgrade to Professional (2 logins) or Business (unlimited logins) in Billing."
+	 * Lists only plans that give more than the limits in force now ($s from status()),
+	 * so a studio is never told to upgrade to the plan it is already on.
+	 * $what: members | leads_per_month | a feature key.
+	 */
+	public static function upgrade_hint( array $s, $what ) {
+		$cur     = self::get( $s['limits_plan'] );
+		$current = in_array( $s['state'], array( 'trial_ended', 'lapsed' ), true ) ? null : $s['plan'];
+		$opts    = array();
+		foreach ( self::all() as $k => $p ) {
+			if ( ! $p['paid'] || $k === $current || $p['sort'] < $cur['sort'] ) {
+				continue;
+			}
+			if ( 'members' === $what || 'leads_per_month' === $what ) {
+				$have = $s[ $what ];
+				$get  = $p[ $what ];
+				if ( $have < 0 || ( $get >= 0 && $get <= $have ) ) {
+					continue;
+				}
+				if ( 'members' === $what ) {
+					$more = $get < 0 ? 'unlimited logins' : ( 1 === $get ? '1 login' : $get . ' logins' );
+				} else {
+					$more = $get < 0 ? 'unlimited leads' : $get . ' leads a month';
+				}
+				$opts[] = $p['label'] . ' (' . $more . ')';
+			} elseif ( in_array( $what, $p['features'], true ) ) {
+				$opts[] = $p['label'];
+			}
+		}
+		if ( ! $opts ) {
+			return 'Contact ShootPilot support for a higher limit.';
+		}
+		$last = array_pop( $opts );
+		return 'Upgrade to ' . ( $opts ? implode( ', ', $opts ) . ' or ' : '' ) . $last . ' in Billing.';
+	}
+
+	/**
 	 * Returns WP_Error when a studio has hit a plan limit, else true.
 	 * $what: members | leads | reports | whatsapp_api | whatsapp_templates | razorpay_links
 	 */
@@ -287,10 +324,11 @@ class Plans {
 			if ( $n >= $s['members'] ) {
 				return self::upgrade_error(
 					sprintf(
-						'Your %s plan includes %s. You are using %d. Upgrade to Professional (2 logins) or Business (unlimited) to add more. Crew without a login can always be added.',
+						'Your %s plan includes %s. You are using %d. %s Crew without a login can always be added.',
 						$name,
 						1 === $s['members'] ? '1 team login' : $s['members'] . ' team logins',
-						$n
+						$n,
+						self::upgrade_hint( $s, 'members' )
 					),
 					'plan_limit',
 					array( 'limit' => 'members', 'used' => $n, 'allowed' => $s['members'] )
@@ -301,7 +339,7 @@ class Plans {
 			$n = self::leads_this_month( $studio->id );
 			if ( $n >= $s['leads_per_month'] ) {
 				return self::upgrade_error(
-					sprintf( 'Your %s plan includes %d new leads a month and you have added %d this month. Upgrade in Billing to add more. The count resets on the 1st.', $name, $s['leads_per_month'], $n ),
+					sprintf( 'Your %s plan includes %d new leads a month and you have added %d this month. %s The count resets on the 1st.', $name, $s['leads_per_month'], $n, self::upgrade_hint( $s, 'leads_per_month' ) ),
 					'plan_limit',
 					array( 'limit' => 'leads', 'used' => $n, 'allowed' => $s['leads_per_month'] )
 				);
@@ -314,7 +352,9 @@ class Plans {
 		);
 		if ( isset( $labels[ $what ] ) && ! in_array( $what, $s['features'], true ) ) {
 			return self::upgrade_error(
-				sprintf( '%s is included in the Professional and Business plans. You are on %s. Upgrade in Billing to use it.', $labels[ $what ], $s['label'] ),
+				in_array( $s['state'], array( 'trial_ended', 'lapsed' ), true ) && in_array( $what, self::get( $s['plan'] )['features'], true )
+					? sprintf( '%s is part of your %s plan, which has ended. Renew it in Billing to use it again.', $labels[ $what ], $s['label'] )
+					: sprintf( '%s is not included in your %s plan. %s', $labels[ $what ], $s['label'], self::upgrade_hint( $s, $what ) ),
 				'plan_feature',
 				array( 'feature' => $what )
 			);
