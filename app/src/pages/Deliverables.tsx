@@ -74,9 +74,9 @@ export default function Deliverables() {
         </div>
         <div className="flex flex-col gap-2 border-b border-line p-3 sm:flex-row sm:items-center">
           <SearchInput value={search} onChange={setSearch} placeholder="Deliverable, client, booking…" className="w-full sm:w-72" />
-          <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="flex min-w-0 items-center gap-2 sm:ml-auto">
             {can('deliverables.view_all') && (
-              <Select value={f.assigned_to} onChange={(e) => setF({ assigned_to: e.target.value, page: '1' })} options={[['unassigned', 'Not assigned'], ...teamOptions(team.data)]} placeholder="Everyone" className="w-auto py-1.5" />
+              <Select value={f.assigned_to} onChange={(e) => setF({ assigned_to: e.target.value, page: '1' })} options={[['unassigned', 'Not assigned'], ...teamOptions(team.data)]} placeholder="Everyone" className="w-auto min-w-0 flex-1 py-1.5 sm:flex-none" />
             )}
             <div className="flex shrink-0 rounded-lg border border-line p-0.5" role="group" aria-label="Group deliverables">
               {([['clients', 'By client', <Users key="c" className="h-3.5 w-3.5" />], ['items', 'All items', <LayoutList key="i" className="h-3.5 w-3.5" />]] as const).map(([k, l, icon]) => (
