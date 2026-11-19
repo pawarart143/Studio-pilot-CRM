@@ -8,7 +8,7 @@ import { useTeam } from '@/lib/data';
 import { useForm } from '@/lib/form';
 import { fmtDateTime } from '@/lib/format';
 import { deliverableTone } from '@/lib/tones';
-import { Badge, Button, Field, Input, Modal, Select, Textarea, Toggle, useUi } from './ui';
+import { Badge, Button, Field, Input, Modal, PageLoader, Select, Textarea, Toggle, useUi } from './ui';
 import { WhatsAppModal } from './shared';
 
 /* ---------- Progress ---------- */
@@ -122,6 +122,50 @@ export function DeliverableModal({ open, onClose, deliverable, bookingId, onSave
           </Field>
         )}
       </div>
+    </Modal>
+  );
+}
+
+/* ---------- Apply a deliverable template to a booking ---------- */
+export function DeliverableTemplateModal({ open, onClose, bookingId, onDone }: { open: boolean; onClose: () => void; bookingId: number; onDone: () => void }) {
+  const { toast } = useUi();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['deliverable-templates', 'active'], queryFn: () => api.get<any[]>('deliverable-templates', { active: 1 }), enabled: open });
+  const [busy, setBusy] = useState<number | null>(null);
+  const apply = async (t: any) => {
+    setBusy(t.id);
+    try {
+      const r: any = await api.post(`bookings/${bookingId}/deliverables/template`, { template_id: t.id });
+      toast(r.added ? `${r.added} deliverable${r.added === 1 ? '' : 's'} added from ${t.name}` : 'All items from this template are already on the booking');
+      qc.invalidateQueries({ queryKey: ['deliverables'] });
+      onDone();
+      onClose();
+    } catch (e: any) {
+      toast(e.message, 'error');
+    }
+    setBusy(null);
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="Apply a deliverable template" subtitle="Items already on this booking are skipped. Dates count from the last event." footer={<Button onClick={onClose}>Close</Button>}>
+      {q.isLoading ? (
+        <PageLoader />
+      ) : !(q.data || []).length ? (
+        <p className="text-sm text-muted">No active templates. Create them in Settings → Deliverable templates.</p>
+      ) : (
+        <ul className="space-y-2">
+          {(q.data || []).map((t: any) => (
+            <li key={t.id} className="rounded-xl border border-line p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium">{t.name}</p>
+                  <p className="text-xs text-muted">{t.items.map((i: any) => i.name).join(', ')}</p>
+                </div>
+                <Button size="sm" variant="primary" loading={busy === t.id} onClick={() => apply(t)}>Apply</Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Modal>
   );
 }

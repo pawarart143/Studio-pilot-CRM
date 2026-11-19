@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useTeam } from '@/lib/data';
 import { fmtDate, fmtDateLong, fmtDateTime, fmtTime, inr, phoneDisplay, telLink, waLink } from '@/lib/format';
 import { bookingTone, eventColor, payLabel, payTone, paymentStatusTone, paymentTypeTone, priorityTone, taskStatusTone } from '@/lib/tones';
-import { DeliverableBadge, DeliverableModal, PaymentHistoryModal, PortalCard, ProgressBar } from '@/components/delivery';
+import { DeliverableBadge, DeliverableModal, DeliverableTemplateModal, PaymentHistoryModal, PortalCard, ProgressBar } from '@/components/delivery';
 import { Avatar, Badge, Button, Card, ErrorState, Field, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Select, Tabs, useUi, EmptyState } from '@/components/ui';
 import { Documents, InfoRow, NoteBox, Timeline, WaButton } from '@/components/shared';
 import { ExpenseModal, PaymentModal, TaskModal } from '@/components/forms';
@@ -311,6 +311,7 @@ export default function BookingDetail() {
                 {canDl && <Button size="sm" variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setDlEdit({})}>Add deliverable</Button>}
               </div>
             </div>
+            {b.client?.id && <Link to={`/deliverables/clients/${b.client.id}`} className="mb-3 inline-flex items-center gap-1 text-xs text-accent-ink hover:underline">All deliverables for {b.client.name}, across every booking <ExternalLink className="h-3 w-3" /></Link>}
             {deliverables.length === 0 ? (
               <EmptyState icon={<PackageCheck className="h-5 w-5" />} title="No deliverables yet" description={canDl ? 'Apply the Wedding Package or Pre-Wedding template, or add items one by one.' : 'The studio has not added deliverables to this booking.'} />
             ) : (
@@ -478,7 +479,7 @@ export default function BookingDetail() {
       <PaymentModal open={!!payEdit} onClose={() => setPayEdit(null)} booking={pay ? b : null} payment={payEdit} />
       <PaymentHistoryModal paymentId={history} onClose={() => setHistory(null)} />
       <DeliverableModal open={!!dlEdit} onClose={() => setDlEdit(null)} deliverable={dlEdit?.id ? dlEdit : undefined} bookingId={b.id} onSaved={refresh} />
-      <TemplateModal open={tplOpen} onClose={() => setTplOpen(false)} bookingId={b.id} onDone={refresh} />
+      <DeliverableTemplateModal open={tplOpen} onClose={() => setTplOpen(false)} bookingId={b.id} onDone={refresh} />
       <ServicesModal open={svcOpen} onClose={() => setSvcOpen(false)} booking={b} onSaved={refresh} />
       <ExpenseModal open={!!expense} onClose={() => setExpense(null)} expense={expense?.id ? expense : undefined} bookingId={b.id} />
       <TaskModal open={!!task} onClose={() => setTask(null)} task={task?.id ? task : undefined} defaults={{ booking_id: b.id }} />
@@ -526,49 +527,6 @@ function ServicesModal({ open, onClose, booking: b, onSaved }: { open: boolean; 
   return (
     <Modal open={open} onClose={onClose} size="lg" title="Services & team" subtitle={`${b.number} · ${b.title}`} footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" loading={busy} onClick={() => save()}>Save</Button></>}>
       <ServicesEditor value={rows} onChange={setRows} dates={(b.events || []).map((e: any) => e.event_date)} bookingId={b.id} errors={errors} />
-    </Modal>
-  );
-}
-
-function TemplateModal({ open, onClose, bookingId, onDone }: { open: boolean; onClose: () => void; bookingId: number; onDone: () => void }) {
-  const { toast } = useUi();
-  const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['deliverable-templates', 'active'], queryFn: () => api.get<any[]>('deliverable-templates', { active: 1 }), enabled: open });
-  const [busy, setBusy] = useState<number | null>(null);
-  const apply = async (t: any) => {
-    setBusy(t.id);
-    try {
-      const r: any = await api.post(`bookings/${bookingId}/deliverables/template`, { template_id: t.id });
-      toast(r.added ? `${r.added} deliverable${r.added === 1 ? '' : 's'} added from ${t.name}` : 'All items from this template are already on the booking');
-      qc.invalidateQueries({ queryKey: ['deliverables'] });
-      onDone();
-      onClose();
-    } catch (e: any) {
-      toast(e.message, 'error');
-    }
-    setBusy(null);
-  };
-  return (
-    <Modal open={open} onClose={onClose} title="Apply a deliverable template" subtitle="Items already on this booking are skipped. Dates count from the last event." footer={<Button onClick={onClose}>Close</Button>}>
-      {q.isLoading ? (
-        <PageLoader />
-      ) : !(q.data || []).length ? (
-        <p className="text-sm text-muted">No active templates. Create them in Settings → Deliverable templates.</p>
-      ) : (
-        <ul className="space-y-2">
-          {(q.data || []).map((t: any) => (
-            <li key={t.id} className="rounded-xl border border-line p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium">{t.name}</p>
-                  <p className="text-xs text-muted">{t.items.map((i: any) => i.name).join(', ')}</p>
-                </div>
-                <Button size="sm" variant="primary" loading={busy === t.id} onClick={() => apply(t)}>Apply</Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
     </Modal>
   );
 }
