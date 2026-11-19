@@ -29,6 +29,7 @@ const Settings = lazy(() => import('@/pages/Settings'));
 const Crew = lazy(() => import('@/pages/crew/Crew'));
 const CrewProfile = lazy(() => import('@/pages/crew/CrewProfile'));
 const Admin = lazy(() => import('@/pages/Admin'));
+const Billing = lazy(() => import('@/pages/Billing'));
 
 const publicPaths = ['/login', '/register', '/forgot', '/reset'];
 
@@ -95,6 +96,7 @@ export default function App() {
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/billing" element={<Billing />} />
             <Route path="/reset" element={<Reset />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

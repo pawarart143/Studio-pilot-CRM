@@ -25,7 +25,7 @@ Browser (React SPA at /crm)  ──REST (cookie + nonce)──►  WordPress
 * `pcrm_members` links a WordPress user to a studio with a CRM role. One user may belong to several studios (studio switcher). Team members without a login (e.g. freelance second shooters) are members with `user_id = NULL`.
 * Each REST request resolves the **current member** (logged-in user + current studio stored in user meta, verified against `pcrm_members`). All queries go through `PCRM\Db` helpers that always add `studio_id = %d`. A record id from another studio returns 404.
 * Studio status `suspended` blocks all API access for that studio (super admin control).
-* Plans: Free, Starter, Professional, Enterprise with limits (team members, leads per month). Limits are enforced server-side on create.
+* Plans: Starter (15-day trial), Professional, Business, stored in `pcrm_plans`. Limits (team logins, new leads a month) and features (WhatsApp templates, Razorpay links) are enforced server-side (`PCRM\Plans::check`). After a trial or plan ends, `Rest\Base::check_plan` makes the studio read-only (HTTP 402 for writes) unless `pcrm_billing_after_expiry` = `starter_limits`. ShootPilot's own subscriptions use Razorpay Subscriptions with platform keys (`PCRM\Billing`, `Rest\Billing`, webhook `/billing/webhook`).
 
 ## 3. Roles & permissions
 

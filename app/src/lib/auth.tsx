@@ -3,7 +3,21 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 
 export type Dict = Record<string, string>;
-export type Plan = { label: string; price: number; members: number; leads_per_month: number; reports: boolean; whatsapp_api: boolean };
+export type Plan = { key?: string; label: string; tagline?: string; price: number; price_yearly?: number; trial_days?: number; members: number; leads_per_month: number; features?: string[]; paid?: boolean; reports: boolean; whatsapp_api: boolean };
+export type BillingStatus = {
+  plan: string;
+  label: string;
+  state: 'trial' | 'trial_ended' | 'active' | 'past_due' | 'lapsed' | 'manual';
+  ends_at: string | null;
+  days_left: number | null;
+  read_only: boolean;
+  after_expiry: 'read_only' | 'starter_limits';
+  limits_plan: string;
+  members: number;
+  leads_per_month: number;
+  features: string[];
+  billing_cycle: string | null;
+};
 export type AppConfig = {
   stages: Dict;
   sources: Dict;
@@ -70,6 +84,8 @@ export type Studio = {
   plan: string;
   plan_info: Plan;
   plan_expires_at?: string | null;
+  trial_ends_at?: string | null;
+  billing?: BillingStatus;
   status: string;
   settings: Record<string, any>;
 };

@@ -69,62 +69,68 @@ class Landing {
 	}
 
 	/**
-	 * Pricing cards. PLACEHOLDER pricing: amounts come from includes/class-plans.php
-	 * and are shown with a "not final" note. Change them there (or with the
-	 * pcrm_landing_pricing filter) once plans are finalised.
+	 * Pricing cards, from the plans in the database (Super Admin → Plans).
+	 * Filter: pcrm_landing_pricing.
 	 */
 	public static function pricing() {
 		$p     = Plans::all();
 		$limit = function ( $n, $one, $many ) {
 			return $n < 0 ? 'Unlimited ' . $many : sprintf( '%s %s', number_format_i18n( $n ), 1 === $n ? $one : $many );
 		};
-		$cards = array(
-			array(
-				'key'      => 'starter',
-				'name'     => 'Starter',
-				'for'      => 'For independent photographers.',
-				'monthly'  => (int) $p['starter']['price'],
-				'featured' => false,
-				'items'    => array(
-					$limit( $p['starter']['members'], 'team login', 'team logins' ),
-					$limit( $p['starter']['leads_per_month'], 'new lead a month', 'new leads a month' ),
-					'Leads, pipeline, calling & follow-ups',
-					'Quotations with GST and PDF',
-					'Bookings, calendar and tasks',
-					'Payments, receipts and expenses',
-					'Razorpay payment links (your own account)',
-					'WhatsApp share with ready templates',
-					'Reports and analytics',
-				),
+		$items = array(
+			'starter'      => array(
+				'Leads, pipeline, calling & follow-ups',
+				'Quotations with GST and PDF',
+				'Bookings, calendar and tasks',
+				'Payments, receipts and expenses',
+				'Reports and analytics',
 			),
-			array(
-				'key'      => 'professional',
-				'name'     => 'Professional',
-				'for'      => 'For growing photography studios.',
-				'monthly'  => (int) $p['professional']['price'],
-				'featured' => true,
-				'items'    => array(
-					$limit( $p['professional']['members'], 'team login', 'team logins' ),
-					$limit( $p['professional']['leads_per_month'], 'lead', 'leads' ),
-					'Everything in Starter',
-					'WhatsApp Cloud API sending (your Meta account)',
-				),
+			'professional' => array(
+				'Everything in Starter',
+				'WhatsApp share with ready templates',
+				'Razorpay payment links (your own account)',
 			),
-			array(
-				'key'      => 'enterprise',
-				'name'     => 'Business',
-				'for'      => 'For large studios and photography agencies.',
-				'monthly'  => (int) $p['enterprise']['price'],
-				'featured' => false,
-				'items'    => array(
-					$limit( $p['enterprise']['members'], 'team login', 'team logins' ),
-					$limit( $p['enterprise']['leads_per_month'], 'lead', 'leads' ),
-					'Everything in Professional',
-					'Best for multi-team agencies',
-				),
+			'business'     => array(
+				'Everything in Professional',
+				'Best for multi-team agencies',
 			),
 		);
+		$for   = array(
+			'starter'      => 'For trying ShootPilot with your studio.',
+			'professional' => 'For growing photography studios.',
+			'business'     => 'For large studios and photography agencies.',
+		);
+		$cards = array();
+		foreach ( $p as $key => $plan ) {
+			$cards[] = array(
+				'key'        => $key,
+				'name'       => $plan['label'],
+				'for'        => isset( $for[ $key ] ) ? $for[ $key ] : $plan['tagline'],
+				'monthly'    => (int) $plan['price'],
+				'yearly'     => (int) $plan['price_yearly'],
+				'trial_days' => (int) $plan['trial_days'],
+				'featured'   => 'professional' === $key,
+				'items'      => array_merge(
+					array(
+						$limit( $plan['members'], 'team login', 'team logins' ),
+						$plan['leads_per_month'] < 0 ? 'Unlimited leads' : $limit( $plan['leads_per_month'], 'new lead a month', 'new leads a month' ),
+					),
+					isset( $items[ $key ] ) ? $items[ $key ] : array()
+				),
+			);
+		}
 		return apply_filters( 'pcrm_landing_pricing', $cards );
+	}
+
+	/** Best yearly saving across paid plans, in percent (for the toggle badge). */
+	public static function yearly_saving() {
+		$best = 0;
+		foreach ( Plans::all() as $plan ) {
+			if ( $plan['price'] > 0 && $plan['price_yearly'] > 0 ) {
+				$best = max( $best, (int) floor( ( 1 - $plan['price_yearly'] / ( $plan['price'] * 12 ) ) * 100 ) );
+			}
+		}
+		return $best;
 	}
 
 	/** Footer / resource links. Empty URL = page not live yet, shown as "Soon". */

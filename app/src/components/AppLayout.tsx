@@ -4,12 +4,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
   UsersRound,
-  BarChart3, Briefcase, PackageCheck, CalendarDays, CheckSquare, ChevronsUpDown, Columns3, CreditCard, FileText, Home, LogOut, Menu as MenuIcon, Moon, Phone, Plus, Search, Settings, Shield, Sun, UserRound, Users, Contact, X, Check,
+  BarChart3, Briefcase, Gem, PackageCheck, CalendarDays, CheckSquare, ChevronsUpDown, Columns3, CreditCard, FileText, Home, LogOut, Menu as MenuIcon, Moon, Phone, Plus, Search, Settings, Shield, Sun, UserRound, Users, Contact, X, Check,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { useDebounce, useTheme } from '@/lib/hooks';
-import { Avatar, Badge, Logo, Menu, MenuItem, useUi } from './ui';
+import { Avatar, Badge, Button, Logo, Menu, MenuItem, Modal, useUi } from './ui';
 import { LeadFormModal } from '@/pages/leads/LeadForm';
 import { AlertWatcher, NotificationBell } from './Notifications';
 
@@ -103,18 +103,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <Settings /> Settings
           </NavLink>
         )}
+        {can('settings.edit') && (
+          <NavLink to="/billing" className={({ isActive }) => clsx('flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium [&>svg]:h-4 [&>svg]:w-4', isActive ? 'bg-accent-soft text-accent-ink' : 'text-muted hover:bg-subtle hover:text-ink')}>
+            <Gem /> Billing & plan
+          </NavLink>
+        )}
         {me.is_super && (
           <NavLink to="/admin" className={({ isActive }) => clsx('flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium [&>svg]:h-4 [&>svg]:w-4', isActive ? 'bg-accent-soft text-accent-ink' : 'text-muted hover:bg-subtle hover:text-ink')}>
             <Shield /> Super Admin
           </NavLink>
         )}
-        <div className="mt-2 rounded-lg bg-subtle px-3 py-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium">{studio.plan_info.label} plan</span>
-            {studio.plan === 'free' && <Badge tone="accent">Upgrade</Badge>}
-          </div>
-          <p className="mt-0.5 text-2xs text-muted">{studio.plan_info.members < 0 ? 'Unlimited' : studio.plan_info.members} team logins · {studio.plan_info.leads_per_month < 0 ? 'unlimited' : studio.plan_info.leads_per_month} leads/mo</p>
-        </div>
+        <PlanBox />
       </div>
     </div>
   );
@@ -162,7 +161,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main className="mx-auto max-w-[1400px] px-3 pb-24 pt-5 sm:px-5 lg:px-7 lg:pb-10">{children}</main>
+        <main className="mx-auto max-w-[1400px] px-3 pb-24 pt-5 sm:px-5 lg:px-7 lg:pb-10">
+          <PlanBanner />
+          {children}
+        </main>
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         {bottom.map((b) => (
@@ -178,6 +180,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </nav>
       <LeadFormModal open={leadOpen} onClose={() => setLeadOpen(false)} />
       <AlertWatcher />
+      <UpgradePrompt />
       <span className="hidden">{member.id}</span>
     </div>
   );
@@ -314,5 +317,92 @@ function GlobalSearch() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Plan summary at the bottom of the sidebar. */
+function PlanBox() {
+  const { studio, can } = useAuth();
+  const b = studio.billing;
+  const label = b?.label || studio.plan_info.label;
+  const members = b ? b.members : studio.plan_info.members;
+  const leads = b ? b.leads_per_month : studio.plan_info.leads_per_month;
+  const body = (
+    <>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium">{label} plan</span>
+        {b?.state === 'trial' && <Badge tone="accent">{b.days_left}d left</Badge>}
+        {(b?.state === 'trial_ended' || b?.state === 'lapsed') && <Badge tone="red">Upgrade</Badge>}
+      </div>
+      <p className="mt-0.5 text-2xs text-muted">{members < 0 ? 'Unlimited' : members} team {members === 1 ? 'login' : 'logins'} · {leads < 0 ? 'unlimited' : leads} leads/mo</p>
+    </>
+  );
+  return can('settings.edit') ? (
+    <Link to="/billing" className="mt-2 block rounded-lg bg-subtle px-3 py-2.5 hover:bg-line/60">{body}</Link>
+  ) : (
+    <div className="mt-2 rounded-lg bg-subtle px-3 py-2.5">{body}</div>
+  );
+}
+
+/** Banner for a trial that is ending or a plan that has ended. */
+function PlanBanner() {
+  const { studio, can } = useAuth();
+  const loc = useLocation();
+  const b = studio.billing;
+  if (!b || loc.pathname === '/billing') return null;
+  const owner = can('settings.edit');
+  let tone = '';
+  let text = '';
+  if (b.state === 'trial' && b.days_left !== null && b.days_left <= 5) {
+    tone = 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200';
+    text = `Your free trial ends in ${b.days_left} ${b.days_left === 1 ? 'day' : 'days'}.`;
+  } else if (b.state === 'trial_ended' || b.state === 'lapsed') {
+    tone = 'border-red-300 bg-red-50 text-red-900 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200';
+    text = (b.state === 'trial_ended' ? 'Your free trial has ended.' : `Your ${b.label} plan has ended.`) + (b.read_only ? ' Your data is safe and you can view it, but adding and editing is paused.' : ' You are on Starter limits.');
+  } else if (b.state === 'past_due') {
+    tone = 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200';
+    text = 'Your renewal payment is pending. Razorpay will retry it.';
+  }
+  if (!text) return null;
+  return (
+    <div className={clsx('mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2.5 text-sm', tone)}>
+      <span>{text}{!owner && ' Ask your studio owner to choose a plan.'}</span>
+      {owner && <Link to="/billing" className="font-semibold underline">See plans</Link>}
+    </div>
+  );
+}
+
+/** Opens when the server answers 402 (plan limit, plan feature or ended trial). */
+function UpgradePrompt() {
+  const { can, refresh } = useAuth();
+  const navigate = useNavigate();
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      setMsg(d.message || 'Your plan does not include this.');
+      if (d.code === 'plan_expired') refresh();
+    };
+    window.addEventListener('pcrm:upgrade', on);
+    return () => window.removeEventListener('pcrm:upgrade', on);
+  }, [refresh]);
+  return (
+    <Modal
+      open={!!msg}
+      onClose={() => setMsg(null)}
+      title="Upgrade your plan"
+      size="sm"
+      footer={
+        <>
+          <Button onClick={() => setMsg(null)}>Close</Button>
+          {can('settings.edit') && (
+            <Button variant="primary" onClick={() => { setMsg(null); navigate('/billing'); }}>See plans</Button>
+          )}
+        </>
+      }
+    >
+      <p className="text-sm">{msg}</p>
+      {!can('settings.edit') && <p className="mt-2 text-sm text-muted">Ask your studio owner or admin to upgrade.</p>}
+    </Modal>
   );
 }

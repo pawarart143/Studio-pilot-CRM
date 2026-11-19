@@ -18,8 +18,11 @@ class Studios {
 		while ( $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'studios' ) . ' WHERE slug=%s', $slug ) ) ) {
 			$slug = $base . '-' . $i++;
 		}
-		$now = Db::now();
-		$ok  = $wpdb->insert(
+		$now   = Db::now();
+		$plan  = Plans::trial_plan();
+		$days  = (int) Plans::get( $plan )['trial_days'];
+		$trial = $days > 0 ? gmdate( 'Y-m-d', strtotime( Db::today() . ' 00:00:00 UTC +' . ( $days - 1 ) . ' days' ) ) : null;
+		$ok    = $wpdb->insert(
 			Installer::table( 'studios' ),
 			array(
 				'name'          => $name,
@@ -28,7 +31,8 @@ class Studios {
 				'email'         => isset( $data['email'] ) ? $data['email'] : null,
 				'phone'         => isset( $data['phone'] ) ? $data['phone'] : null,
 				'city'          => isset( $data['city'] ) ? $data['city'] : null,
-				'plan'          => 'free',
+				'plan'          => $plan,
+				'trial_ends_at' => $trial,
 				'status'        => 'active',
 				'settings'      => wp_json_encode( Config::default_settings() ),
 				'created_at'    => $now,
