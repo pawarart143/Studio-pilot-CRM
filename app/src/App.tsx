@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { AuthProvider, useMe } from '@/lib/auth';
+import type { ReactNode } from 'react';
+import { AuthProvider, useAuth, useMe } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { ErrorState, PageLoader } from '@/components/ui';
 import AppLayout from '@/components/AppLayout';
 import { Login, Register, Forgot, Reset, CreateStudio } from '@/pages/Auth';
@@ -60,6 +62,7 @@ export default function App() {
         </Suspense>
       );
     }
+    if (me.access_off) return <AccessOff email={me.user.email} />;
     return <CreateStudio me={me} />;
   }
 
@@ -80,17 +83,17 @@ export default function App() {
             <Route path="/bookings/new" element={<BookingForm />} />
             <Route path="/bookings/:id" element={<BookingDetail />} />
             <Route path="/bookings/:id/edit" element={<BookingForm />} />
-            <Route path="/payments" element={<Payments />} />
+            <Route path="/payments" element={<Guard perm="payments.view"><Payments /></Guard>} />
             <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/team/:id" element={<TeamProfile />} />
+            <Route path="/team" element={<Guard perm="team.view"><Team /></Guard>} />
+            <Route path="/team/:id" element={<Guard perm="team.view"><TeamProfile /></Guard>} />
             <Route path="/deliverables" element={<Deliverables />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/crew" element={<Crew />} />
             <Route path="/crew/members/:id" element={<CrewProfile />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/clients/:id" element={<ClientDetail />} />
-            <Route path="/reports" element={<Reports />} />
+            <Route path="/reports" element={<Guard perm="reports.view"><Reports /></Guard>} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/reset" element={<Reset />} />
@@ -106,6 +109,30 @@ function FullLoader() {
   return (
     <div className="flex h-screen items-center justify-center">
       <PageLoader />
+    </div>
+  );
+}
+
+/** Pages owner/admin only. The server refuses the data too; this keeps the page clean. */
+function Guard({ perm, children }: { perm: string; children: ReactNode }) {
+  const { can } = useAuth();
+  if (can(perm)) return <>{children}</>;
+  return (
+    <div className="py-24 text-center">
+      <p className="text-lg font-semibold">You don't have access to this page</p>
+      <p className="mt-2 text-sm text-muted">Payments, reports, team and business settings are only for the studio owner and admins.</p>
+    </div>
+  );
+}
+
+function AccessOff({ email }: { email: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-app p-4">
+      <div className="max-w-sm rounded-xl border border-line bg-surface p-6 text-center shadow-sm">
+        <p className="text-lg font-semibold">Your team access is turned off</p>
+        <p className="mt-2 text-sm text-muted">You are signed in as {email}, but your studio has deactivated your access. Please ask your studio owner to activate you again.</p>
+        <button className="mt-4 text-sm font-medium text-accent-ink" onClick={async () => (await api.post('auth/logout'), (window.location.href = window.PCRM.base + '/login'))}>Sign out</button>
+      </div>
     </div>
   );
 }

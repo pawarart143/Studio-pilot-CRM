@@ -73,6 +73,7 @@ export type Studio = {
 export type Me = {
   user: { id: number; name: string; email: string } | null;
   is_super?: boolean;
+  access_off?: boolean;
   member?: Member | null;
   permissions?: string[];
   studios?: { id: number; name: string; role: string; plan: string; status: string }[];

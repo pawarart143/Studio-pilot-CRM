@@ -33,7 +33,7 @@ class Team extends Base {
 	public function register() {
 		$this->route( '/team', 'GET', array( $this, 'index' ), 'member' );
 		$this->route( '/team', 'POST', array( $this, 'create' ), 'team.edit' );
-		$this->route( '/team/availability', 'GET', array( $this, 'availability' ), 'team.view' );
+		$this->route( '/team/availability', 'GET', array( $this, 'availability' ), array( 'team.view', 'bookings.assign' ) );
 		$this->route( '/team/performance', 'GET', array( $this, 'performance' ), 'reports.view' );
 		$this->route( '/team/(?P<id>\d+)', 'GET', array( $this, 'show' ), 'team.view' );
 		$this->route( '/team/(?P<id>\d+)', 'PUT', array( $this, 'update' ), 'team.edit' );
@@ -165,7 +165,8 @@ class Team extends Base {
 			$r->open_tasks      = (int) $r->open_tasks;
 			$r->upcoming_events = (int) $r->upcoming_events;
 			$r->open_deliverables = (int) $r->open_deliverables;
-			if ( ! Tenant::can( 'team.view' ) ) {
+			// Production managers need teammates' numbers to coordinate shoots.
+			if ( ! Tenant::can( 'team.view' ) && ! Tenant::can( 'bookings.assign' ) ) {
 				unset( $r->email, $r->phone, $r->notes, $r->joining_date );
 			}
 			if ( ! Tenant::can( 'team.edit' ) ) {
@@ -239,10 +240,31 @@ class Team extends Base {
 			'You have been added to ' . $studio->name . ' on ShootPilot',
 			"Hi $name,\n\n{$studio->name} has added you to their team on ShootPilot.\n\nSign in: " . home_url( '/crm/login' ) . "\nEmail: $email\n" . ( $gen ? "Set your password here: " . home_url( '/crm/forgot' ) . "\n" : "Your password was shared by your admin.\n" )
 		);
-		return array(
+		$out = array(
 			'created' => true,
 			'mailed'  => (bool) $mailed,
 		);
+		// A generated password is otherwise unknown to everyone, so the member
+		// could never sign in when the invite email does not arrive. Show it to
+		// the admin once so they can share it.
+		if ( $gen ) {
+			$out['password'] = $password;
+		}
+		return $out;
+	}
+
+	/**
+	 * True when the WordPress account is used only by this studio, so its admin
+	 * may set the password or email. Accounts shared with another studio, or
+	 * WordPress administrators, are never changed from here.
+	 */
+	private function login_owned_by_studio( $user_id ) {
+		global $wpdb;
+		if ( ! $user_id || user_can( (int) $user_id, 'manage_options' ) ) {
+			return false;
+		}
+		$other = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . Db::t( 'members' ) . ' WHERE user_id=%d AND studio_id<>%d', $user_id, $this->sid() ) );
+		return 0 === $other;
 	}
 
 	public function create( $req ) {
@@ -302,8 +324,55 @@ class Team extends Base {
 		if ( (int) $m->user_id === get_current_user_id() && isset( $data['status'] ) && 'inactive' === $data['status'] ) {
 			return new \WP_Error( 'validation_failed', 'You cannot deactivate yourself.', array( 'status' => 422 ) );
 		}
-		Db::update( 'members', $id, $data );
 		$b = $this->body( $req );
+		$new_password = isset( $b['password'] ) ? (string) $b['password'] : '';
+		$login_info   = null;
+		if ( $m->user_id ) {
+			$owned = $this->login_owned_by_studio( (int) $m->user_id );
+			if ( '' !== $new_password ) {
+				if ( 'owner' === $m->role && (int) $m->user_id !== get_current_user_id() ) {
+					return new \WP_Error( 'forbidden', "Only the owner can change the owner's password.", array( 'status' => 403 ) );
+				}
+				if ( strlen( $new_password ) < 8 ) {
+					return new \WP_Error( 'validation_failed', 'Password must be at least 8 characters.', array( 'status' => 422, 'errors' => array( 'password' => 'At least 8 characters.' ) ) );
+				}
+				if ( ! $owned ) {
+					return new \WP_Error( 'validation_failed', 'This person also uses this login for another studio, so only they can change its password (Forgot password on the sign-in page).', array( 'status' => 422, 'errors' => array( 'password' => 'Shared login: ask them to use Forgot password.' ) ) );
+				}
+			}
+			// Keep the sign-in email in step with the member's email, otherwise
+			// they can no longer sign in with the address the admin shows them.
+			if ( ! empty( $data['email'] ) ) {
+				$u = get_userdata( (int) $m->user_id );
+				if ( $u && strtolower( $u->user_email ) !== strtolower( $data['email'] ) ) {
+					$taken = get_user_by( 'email', $data['email'] );
+					if ( $taken && (int) $taken->ID !== (int) $u->ID ) {
+						return new \WP_Error( 'validation_failed', 'Another account already signs in with this email.', array( 'status' => 422, 'errors' => array( 'email' => 'Already used by another login.' ) ) );
+					}
+					if ( 'owner' === $m->role && (int) $m->user_id !== get_current_user_id() ) {
+						return new \WP_Error( 'forbidden', "Only the owner can change the owner's sign-in email.", array( 'status' => 403 ) );
+					}
+					if ( ! $owned ) {
+						return new \WP_Error( 'validation_failed', 'This login is shared with another studio, so its email cannot be changed here.', array( 'status' => 422, 'errors' => array( 'email' => 'Shared login: email cannot be changed here.' ) ) );
+					}
+				}
+			}
+		}
+		Db::update( 'members', $id, $data );
+		if ( $m->user_id ) {
+			$u = get_userdata( (int) $m->user_id );
+			if ( $u && ! empty( $data['email'] ) && strtolower( $u->user_email ) !== strtolower( $data['email'] ) ) {
+				wp_update_user( array( 'ID' => $u->ID, 'user_email' => $data['email'] ) );
+				$login_info = array( 'email_changed' => true );
+			}
+			if ( '' !== $new_password ) {
+				wp_set_password( $new_password, (int) $m->user_id );
+				if ( (int) $m->user_id === get_current_user_id() ) {
+					wp_set_auth_cookie( (int) $m->user_id, true, is_ssl() );
+				}
+				$login_info = array_merge( (array) $login_info, array( 'password_set' => true ) );
+			}
+		}
 		if ( ! empty( $b['create_login'] ) && ! $m->user_id ) {
 			$limit = Plans::check( Tenant::studio(), 'members' );
 			if ( is_wp_error( $limit ) ) {
@@ -313,12 +382,15 @@ class Team extends Base {
 			if ( ! $email ) {
 				return new \WP_Error( 'validation_failed', 'Email is required to give this member a login.', array( 'status' => 422 ) );
 			}
-			$r = $this->attach_login( $id, $email, isset( $data['name'] ) ? $data['name'] : $m->name, isset( $b['password'] ) ? (string) $b['password'] : '' );
+			$r = $this->attach_login( $id, $email, isset( $data['name'] ) ? $data['name'] : $m->name, $new_password );
 			if ( is_wp_error( $r ) ) {
 				return $r;
 			}
+			$login_info = $r;
 		}
-		return $this->ok( Db::cast( Db::find( 'members', $id ) ) );
+		$out        = Db::cast( Db::find( 'members', $id ) );
+		$out->login = $login_info;
+		return $this->ok( $out );
 	}
 
 	public function destroy( $req ) {

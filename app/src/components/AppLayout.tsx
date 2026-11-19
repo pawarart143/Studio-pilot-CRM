@@ -108,6 +108,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <Shield /> Super Admin
           </NavLink>
         )}
+        {can('settings.edit') && (
         <div className="mt-2 rounded-lg bg-subtle px-3 py-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium">{studio.plan_info.label} plan</span>
@@ -115,6 +116,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
           <p className="mt-0.5 text-2xs text-muted">{studio.plan_info.members < 0 ? 'Unlimited' : studio.plan_info.members} team logins · {studio.plan_info.leads_per_month < 0 ? 'unlimited' : studio.plan_info.leads_per_month} leads/mo</p>
         </div>
+        )}
       </div>
     </div>
   );
