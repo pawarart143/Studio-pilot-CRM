@@ -11,13 +11,15 @@ import { Badge, Button, Card, CardHeader, Checkbox, EmptyState, ErrorState, Fiel
 import { PortalCard, portalStatus } from '@/components/delivery';
 import { Link } from 'react-router-dom';
 import EnquirySettings from '@/pages/enquiry/EnquirySettings';
+import PackagesTab from '@/pages/quotations/PackagesTab';
+import { LinesEditor, ScheduleEditor, linesFrom, milestonesFrom, num as qnum, type Milestone } from '@/pages/quotations/parts';
 
 export default function Settings() {
   const { can, member } = useAuth();
   const admin = can('settings.edit');
   const [f, setF] = useUrlState({ tab: admin ? 'studio' : 'profile' });
   const tabs: [string, string][] = admin
-    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['whatsapp', 'WhatsApp'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
+    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['packages', 'Quote packages'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['whatsapp', 'WhatsApp'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
     : [['profile', 'My profile']];
   const tab = tabs.some(([k]) => k === f.tab) ? f.tab : tabs[0][0];
   return (
@@ -29,6 +31,7 @@ export default function Settings() {
           {tab === 'studio' && <StudioTab />}
           {tab === 'business' && <BusinessTab />}
           {tab === 'services' && <ServicesTab />}
+          {tab === 'packages' && <PackagesTab />}
           {tab === 'deliverables' && <TemplatesTab />}
           {tab === 'portal' && <PortalsTab />}
           {tab === 'enquiry' && <EnquirySettings />}
@@ -180,9 +183,17 @@ function BusinessTab() {
     receipt_prefix: s.receipt_prefix || 'RC',
     quote_validity: String(s.quote_validity ?? 15),
     quote_terms: s.quote_terms || '',
+    quote_intro: s.quote_intro || '',
+    quote_closing: s.quote_closing || '',
+    quote_accent: s.quote_accent || '#F3724C',
+    quote_show_prices: s.quote_show_prices !== false,
+    gst_type: s.gst_type === 'inter' ? 'inter' : 'intra',
     bank_details: s.bank_details || '',
     upi_id: s.upi_id || '',
   });
+  const [qDeliverables, setQDeliverables] = useState<string[]>(() => linesFrom(s.quote_deliverables));
+  const [qExclusions, setQExclusions] = useState<string[]>(() => linesFrom(s.quote_exclusions));
+  const [qSchedule, setQSchedule] = useState<Milestone[]>(() => milestonesFrom(s.quote_payment_schedule));
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     const v = f.values;
@@ -190,10 +201,14 @@ function BusinessTab() {
     if (isNaN(Number(v.gst_rate)) || Number(v.gst_rate) < 0 || Number(v.gst_rate) > 28) e.gst_rate = 'Between 0 and 28.';
     if (!/^\d+$/.test(v.quote_validity) || Number(v.quote_validity) < 1) e.quote_validity = 'Number of days.';
     if (v.upi_id && !/^[\w.-]+@[\w.-]+$/.test(v.upi_id)) e.upi_id = 'Looks like name@bank.';
+    if (!/^#[0-9a-f]{6}$/i.test(v.quote_accent)) e.quote_accent = 'Use a colour like #F3724C.';
+    const sum = qSchedule.reduce((a, m) => a + qnum(m.percent), 0);
+    if (qSchedule.some((m) => !m.label.trim() || qnum(m.percent) <= 0)) e.payment_schedule = 'Every milestone needs a name and a percentage.';
+    else if (qSchedule.length && Math.abs(sum - 100) > 0.01) e.payment_schedule = `Milestones add up to ${sum}%. They must add up to 100%.`;
     f.setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
-    await save({ settings: { ...v, gst_rate: Number(v.gst_rate), quote_validity: Number(v.quote_validity) } }, f);
+    await save({ settings: { ...v, gst_rate: Number(v.gst_rate), quote_validity: Number(v.quote_validity), quote_deliverables: qDeliverables.join('\n'), quote_exclusions: qExclusions.join('\n'), quote_payment_schedule: qSchedule.map(({ key, ...m }) => ({ ...m, percent: qnum(m.percent) })) } }, f);
     setBusy(false);
   };
   return (
@@ -202,6 +217,11 @@ function BusinessTab() {
         <h3 className="text-sm font-semibold">GST</h3>
         <Toggle checked={f.values.gst_enabled} onChange={(v) => f.set('gst_enabled', v)} label="Add GST to new quotations by default" />
         {f.values.gst_enabled && <Field label="Default GST rate (%)" error={f.errors.gst_rate} hint="Split as CGST + SGST on documents." className="max-w-[200px]"><Input {...f.bind('gst_rate')} inputMode="decimal" /></Field>}
+        {f.values.gst_enabled && (
+          <Field label="Default GST type" hint="IGST for clients in another state. Can be changed on each quotation.">
+            <Select value={f.values.gst_type} onChange={(e) => f.set('gst_type', e.target.value)} options={[['intra', 'Same state: CGST + SGST'], ['inter', 'Other state: IGST']]} className="max-w-xs" />
+          </Field>
+        )}
       </section>
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Numbering</h3>
@@ -215,6 +235,30 @@ function BusinessTab() {
         <h3 className="text-sm font-semibold">Quotations</h3>
         <Field label="Valid for (days)" error={f.errors.quote_validity} className="max-w-[200px]"><Input {...f.bind('quote_validity')} inputMode="numeric" /></Field>
         <Field label="Default terms & conditions"><Textarea rows={5} {...f.bind('quote_terms')} /></Field>
+        <Field label="Introduction" hint="Opens every new quotation."><Textarea rows={3} {...f.bind('quote_intro')} /></Field>
+        <Field label="Closing message" hint="Shown at the end of every new quotation."><Textarea rows={2} {...f.bind('quote_closing')} /></Field>
+        <div className="flex flex-wrap items-end gap-6">
+          <Field label="Quotation colour" error={f.errors.quote_accent} hint="Used on the PDF and the client page.">
+            <div className="flex items-center gap-2">
+              <input type="color" value={/^#[0-9a-f]{6}$/i.test(f.values.quote_accent) ? f.values.quote_accent : '#F3724C'} onChange={(e) => f.set('quote_accent', e.target.value.toUpperCase())} className="h-9 w-12 cursor-pointer rounded border border-line bg-surface" aria-label="Pick colour" />
+              <Input {...f.bind('quote_accent')} className="w-28 uppercase" maxLength={7} />
+            </div>
+          </Field>
+          <div className="pb-2"><Toggle checked={f.values.quote_show_prices} onChange={(v) => f.set('quote_show_prices', v)} label="Show rate per line by default" /></div>
+        </div>
+        <div>
+          <p className="label">Default deliverables</p>
+          <LinesEditor value={qDeliverables} onChange={setQDeliverables} placeholder="e.g. Edited photos in an online gallery" />
+        </div>
+        <div>
+          <p className="label">Default “Not included” list</p>
+          <LinesEditor value={qExclusions} onChange={setQExclusions} placeholder="e.g. Travel outside the city" />
+        </div>
+        <div>
+          <p className="label">Default payment plan</p>
+          <ScheduleEditor value={qSchedule} onChange={setQSchedule} total={100000} error={f.errors.payment_schedule} />
+          <p className="mt-1 text-2xs text-faint">Amounts above are an example on ₹1,00,000.</p>
+        </div>
       </section>
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Payment details (printed on quotations and receipts)</h3>

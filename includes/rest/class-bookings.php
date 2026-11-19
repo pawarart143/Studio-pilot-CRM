@@ -349,8 +349,34 @@ class Bookings extends Base {
 				);
 			}
 		}
+		// v0.6.0: a quotation with its own event days and venues wins over the lead's date range.
+		$schedule = array();
+		if ( $q ) {
+			$qevents = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . Db::t( 'quotation_events' ) . ' WHERE quotation_id=%d AND studio_id=%d AND event_date IS NOT NULL ORDER BY sort, id', $q->id, $this->sid() ) );
+			if ( $qevents ) {
+				$events = array();
+				foreach ( $qevents as $e ) {
+					$events[] = array(
+						'name'       => $e->name,
+						'event_type' => $e->event_type,
+						'event_date' => $e->event_date,
+						'start_time' => $e->start_time,
+						'end_time'   => $e->end_time,
+						'venue'      => $e->venue,
+						'city'       => $e->city,
+						'notes'      => $e->notes,
+						'team'       => array(),
+					);
+				}
+			}
+			$sched = json_decode( (string) $q->payment_schedule, true );
+			if ( is_array( $sched ) && $sched ) {
+				$schedule = Quotations::schedule_amounts( $sched, (float) $q->total );
+			}
+		}
 		return $this->ok(
 			array(
+				'payment_schedule' => $schedule,
 				'lead_id'         => (int) $lead->id,
 				'client_id'       => $lead->client_id ? (int) $lead->client_id : null,
 				'client'          => array( 'name' => $lead->name, 'phone' => $lead->phone, 'email' => $lead->email, 'city' => $lead->city ),

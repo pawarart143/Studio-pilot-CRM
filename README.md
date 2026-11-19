@@ -14,6 +14,36 @@ Modules include:
 
 Defaults are INR (₹), India, DD-MM-YYYY, Asia/Kolkata and +91.
 
+## What's new in v0.6.0-quotation (Quotation generator)
+
+Update with "Replace current with uploaded". Nothing is removed. Existing quotations keep their numbers, totals and links.
+
+- **Step-by-step builder** (Quotations → New): 1. Client & events, 2. Services & packages, 3. Deliverables & payments, 4. Terms & review. Click any step at any time. The summary on the right updates the total, GST and every payment milestone as you type. Step 4 shows a live preview of exactly what the client will see.
+- **Several events in one quotation:** each day has a name, type, date, time, venue, city, notes and the team you promise (traditional / candid photographer, traditional videographer, cinematographer, drone, assistant, with counts). "Copy to the next day" repeats a day. A quotation made from a lead gets one day per date of the lead.
+- **Packages** (Settings → Quote packages): a package is a set of services with your rates, the deliverables and the team per day. One tap adds it to a quotation; every line stays editable. "Save as package" on the builder turns the current lines into a package. Three starter packages (Wedding – Essentials, Wedding – Signature, Pre-Wedding Shoot) are created from your own price list on update; they are skipped if your catalogue doesn't have matching services.
+- **Lines are grouped** as Packages, Services and Add-ons. Units from your price list (day, album, set) are shown.
+- **GST:** CGST + SGST for clients in your state or IGST for other states, per quotation, with a studio default. Flat or % discount as before.
+- **Payment plan:** up to 6 milestones that must add up to 100% (quick splits 50/30/20, 50/50, 30/40/30…). Amounts follow the total.
+- **Deliverables and "Not included"** lists with one-tap suggestions.
+- **Set once in Settings → Quotes & invoices:** introduction, closing message, terms, default deliverables, "Not included", payment plan, GST type, quotation colour and whether to show the rate of each line.
+- **Premium PDF:** brand band in your quotation colour with logo, event schedule with team, grouped investment table, GST split, amount in words, payment plan with amounts, deliverables, not included, terms, payment details, signature lines and an "Accepted online by …" stamp once accepted.
+- **Client link** (`/crm/q/…`): redesigned page for phone and desktop. The client sees events, investment, payment plan and deliverables, downloads the PDF, asks on WhatsApp (when the studio phone is set), and **accepts by typing their name and ticking the terms**, or declines with a reason. Their message is shown on the quotation. Views are counted (staff who are signed in are not counted). **New client link** makes the old link stop working. Copying the link of a draft marks it Sent.
+- **Timeline** on every quotation: created, edited (with old → new total), sent, opened by client, accepted / declined, client message, PDF downloaded by client, new link.
+- **Convert to booking** now carries over every event day (date, time, venue, city, notes), the quoted services, and the payment plan as the booking's installments. Accepting still moves the lead to Negotiation, and creating the booking still marks the quotation Accepted.
+
+### Database changes (v0.6.0-quotation)
+
+Versioned on its own option `pcrm_quote_db_version` (= 1), separate from `pcrm_db_version`.
+
+| Table | Change |
+|---|---|
+| `pcrm_quotations` | new columns: intro, closing, deliverables, exclusions, payment_schedule (JSON), gst_type, show_prices, package_id, view_count, last_viewed_at, accepted_name, client_note, response_ip_hash |
+| `pcrm_quotation_items` | new columns: kind (package / service / addon), unit |
+| `pcrm_quotation_events` | new: event days per quotation with coverage (team counts) |
+| `pcrm_quote_packages`, `pcrm_quote_package_items` | new: reusable packages |
+
+On update each existing quotation with a date or venue gets one event row from it. Every new table has `studio_id`, and every query is limited to the signed-in studio. Package edits need Settings rights (owner/admin); sales can use packages on quotations.
+
 ## What's new in v0.5.0 (Crew Scheduling and Public Enquiry Form)
 
 Update with "Replace current with uploaded". Nothing is removed. The update adds new tables and a few new columns on leads (see "Database changes (v0.5.0)").
@@ -191,6 +221,7 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 | Feature | Status |
 |---|---|
 | Quotation and receipt PDFs (₹, logo) | Working, tested |
+| Quotation generator (v0.6.0) | Working. Tested by API (59 checks) and in the browser: create from a lead, package, extra event day, payment plan, edit, PDF, copy link, client accept and decline on a phone, convert to booking with events, services and installments, two studios kept apart, role limits, upgrade from v0.5.0 with data unchanged |
 | WhatsApp share links with templates | Working, tested |
 | Client portal with PIN (v0.4.1) | Working. Tested on a fresh install and an install upgraded from v0.3.0: generate, view, verify, wrong PIN, refresh, second device, regenerate, disable, and two studios kept apart |
 | Crew Scheduling (v0.5.0) | Working. Tested by API (59 checks) and in the browser on a fresh install and an upgraded install, including clashes, override, reassign, payments, Reports and role limits |
