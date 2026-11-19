@@ -18,8 +18,26 @@ class Installer {
 	}
 
 	public static function maybe_upgrade() {
-		if ( get_option( 'pcrm_db_version' ) !== PCRM_DB_VERSION ) {
+		if ( get_option( 'pcrm_db_version' ) !== PCRM_DB_VERSION || get_option( 'pcrm_quote_db_version' ) !== PCRM_QUOTE_DB_VERSION ) {
 			self::install();
+		}
+	}
+
+	/**
+	 * Quotation generator data migrations (v0.6.0). Keyed to pcrm_quote_db_version.
+	 * Only adds data: existing quotations get an event row from their single date/venue.
+	 */
+	public static function migrate_quotes( $from ) {
+		global $wpdb;
+		$from = (int) $from;
+		if ( $from < 1 ) {
+			$q  = self::table( 'quotations' );
+			$qe = self::table( 'quotation_events' );
+			$wpdb->query( "INSERT INTO $qe (studio_id, quotation_id, name, event_type, event_date, venue, sort) SELECT q.studio_id, q.id, COALESCE(NULLIF(q.title,''),'Event'), q.event_type, q.event_date, q.venue, 0 FROM $q q WHERE (q.event_date IS NOT NULL OR (q.venue IS NOT NULL AND q.venue<>'')) AND NOT EXISTS (SELECT 1 FROM $qe e WHERE e.quotation_id=q.id)" );
+			$studios = $wpdb->get_col( 'SELECT id FROM ' . self::table( 'studios' ) );
+			foreach ( $studios as $sid ) {
+				Seeder::default_quote_packages( (int) $sid );
+			}
 		}
 	}
 
@@ -67,7 +85,7 @@ class Installer {
 	}
 
 	public static function tables() {
-		return array( 'studios', 'members', 'clients', 'leads', 'activities', 'calls', 'followups', 'services', 'quotations', 'quotation_items', 'bookings', 'booking_events', 'event_assignments', 'installments', 'payments', 'expenses', 'tasks', 'documents', 'wa_templates', 'payment_links', 'payment_activity_logs', 'booking_services', 'service_team_assignments', 'deliverable_templates', 'deliverable_template_items', 'booking_deliverables', 'client_portals', 'crew_members', 'crew_schedules', 'crew_schedule_assignments', 'crew_expenses', 'crew_expense_payments', 'public_enquiry_forms', 'enquiry_form_fields', 'enquiry_submissions', 'audit_logs' );
+		return array( 'studios', 'members', 'clients', 'leads', 'activities', 'calls', 'followups', 'services', 'quotations', 'quotation_items', 'bookings', 'booking_events', 'event_assignments', 'installments', 'payments', 'expenses', 'tasks', 'documents', 'wa_templates', 'payment_links', 'payment_activity_logs', 'booking_services', 'service_team_assignments', 'deliverable_templates', 'deliverable_template_items', 'booking_deliverables', 'client_portals', 'crew_members', 'crew_schedules', 'crew_schedule_assignments', 'crew_expenses', 'crew_expense_payments', 'public_enquiry_forms', 'enquiry_form_fields', 'enquiry_submissions', 'audit_logs', 'quotation_events', 'quote_packages', 'quote_package_items' );
 	}
 
 	public static function install() {
@@ -280,6 +298,19 @@ class Installer {
 			total DECIMAL(12,2) NOT NULL DEFAULT 0,
 			notes TEXT NULL,
 			terms TEXT NULL,
+			intro TEXT NULL,
+			closing TEXT NULL,
+			deliverables TEXT NULL,
+			exclusions TEXT NULL,
+			payment_schedule TEXT NULL,
+			gst_type VARCHAR(10) NOT NULL DEFAULT 'intra',
+			show_prices TINYINT(1) NOT NULL DEFAULT 1,
+			package_id BIGINT UNSIGNED NULL,
+			view_count INT NOT NULL DEFAULT 0,
+			last_viewed_at DATETIME NULL,
+			accepted_name VARCHAR(190) NULL,
+			client_note TEXT NULL,
+			response_ip_hash VARCHAR(64) NULL,
 			public_token VARCHAR(64) NOT NULL,
 			sent_at DATETIME NULL,
 			viewed_at DATETIME NULL,
@@ -305,9 +336,62 @@ class Installer {
 			qty DECIMAL(10,2) NOT NULL DEFAULT 1,
 			rate DECIMAL(12,2) NOT NULL DEFAULT 0,
 			amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+			kind VARCHAR(20) NOT NULL DEFAULT 'service',
+			unit VARCHAR(40) NULL,
 			sort INT NOT NULL DEFAULT 0,
 			PRIMARY KEY  (id),
 			KEY quotation_id (quotation_id)
+		) $c;";
+
+		/* ---------- v0.6.0: quotation generator ---------- */
+		$sql[] = "CREATE TABLE {$t('quotation_events')} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			studio_id BIGINT UNSIGNED NOT NULL,
+			quotation_id BIGINT UNSIGNED NOT NULL,
+			name VARCHAR(190) NOT NULL,
+			event_type VARCHAR(40) NULL,
+			event_date DATE NULL,
+			start_time TIME NULL,
+			end_time TIME NULL,
+			venue VARCHAR(255) NULL,
+			city VARCHAR(100) NULL,
+			coverage TEXT NULL,
+			notes TEXT NULL,
+			sort INT NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			KEY studio_quote (studio_id,quotation_id)
+		) $c;";
+
+		$sql[] = "CREATE TABLE {$t('quote_packages')} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			studio_id BIGINT UNSIGNED NOT NULL,
+			name VARCHAR(190) NOT NULL,
+			event_type VARCHAR(40) NULL,
+			description TEXT NULL,
+			deliverables TEXT NULL,
+			coverage TEXT NULL,
+			is_active TINYINT(1) NOT NULL DEFAULT 1,
+			sort INT NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY studio_id (studio_id)
+		) $c;";
+
+		$sql[] = "CREATE TABLE {$t('quote_package_items')} (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			studio_id BIGINT UNSIGNED NOT NULL,
+			package_id BIGINT UNSIGNED NOT NULL,
+			service_id BIGINT UNSIGNED NULL,
+			category VARCHAR(40) NULL,
+			name VARCHAR(190) NOT NULL,
+			description TEXT NULL,
+			qty DECIMAL(10,2) NOT NULL DEFAULT 1,
+			rate DECIMAL(12,2) NOT NULL DEFAULT 0,
+			unit VARCHAR(40) NULL,
+			sort INT NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			KEY studio_package (studio_id,package_id)
 		) $c;";
 
 		$sql[] = "CREATE TABLE {$t('bookings')} (
@@ -829,5 +913,12 @@ class Installer {
 			self::migrate( 0 );
 		}
 		update_option( 'pcrm_db_version', PCRM_DB_VERSION );
+
+		$qfrom = get_option( 'pcrm_quote_db_version' );
+		if ( $qfrom !== PCRM_QUOTE_DB_VERSION ) {
+			// Fresh installs have no studios yet, so this only touches existing data on update.
+			self::migrate_quotes( false === $qfrom ? 0 : $qfrom );
+			update_option( 'pcrm_quote_db_version', PCRM_QUOTE_DB_VERSION );
+		}
 	}
 }

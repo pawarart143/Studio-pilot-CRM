@@ -55,6 +55,103 @@ class Seeder {
 			);
 		}
 		self::defaults_v3( $studio_id );
+		self::default_quote_packages( $studio_id );
+	}
+
+	/**
+	 * Starter quotation packages (v0.6.0), built only from the studio's own
+	 * service catalogue so prices are the studio's, never invented. Skipped if
+	 * the studio already has packages.
+	 */
+	public static function default_quote_packages( $studio_id ) {
+		global $wpdb;
+		if ( $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . Db::t( 'quote_packages' ) . ' WHERE studio_id=%d', $studio_id ) ) ) {
+			return;
+		}
+		$services = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . Db::t( 'services' ) . ' WHERE studio_id=%d AND is_active=1 ORDER BY sort, id', $studio_id ) );
+		if ( ! $services ) {
+			return;
+		}
+		$find = function ( $needle ) use ( $services ) {
+			foreach ( $services as $s ) {
+				if ( false !== stripos( $s->name, $needle ) ) {
+					return $s;
+				}
+			}
+			return null;
+		};
+		$roles = array_keys( Config::quote_coverage_roles() );
+		$specs = array(
+			array(
+				'Wedding – Essentials',
+				'wedding',
+				'Traditional photo and video coverage with an album. Good for 1 to 2 day weddings.',
+				array( array( 'Traditional Photography', 2 ), array( 'Traditional Videography', 2 ), array( 'Premium Album', 1 ) ),
+				array( 'Edited high-resolution photographs in an online gallery', 'Full-length traditional video of all rituals', 'Premium lay-flat photo album', 'All raw photographs and video footage on a drive' ),
+				array( 'traditional_photographer' => 1, 'traditional_videographer' => 1 ),
+			),
+			array(
+				'Wedding – Signature',
+				'wedding',
+				'Candid and cinematic team with traditional coverage, drone, reels and albums.',
+				array( array( 'Traditional Photography', 2 ), array( 'Candid Photography', 2 ), array( 'Traditional Videography', 2 ), array( 'Cinematic Wedding Film', 2 ), array( 'Drone Coverage', 1 ), array( 'Instagram Reels', 1 ), array( 'Premium Album', 1 ), array( 'Parents Album', 1 ) ),
+				array( 'Edited high-resolution photographs in an online gallery', 'Cinematic highlight film (4 to 6 minutes)', 'Teaser film (about 1 minute)', 'Full-length traditional video of all rituals', 'Instagram reels, ready to post', 'Premium lay-flat photo album', 'Photo-book for parents', 'All raw photographs and video footage on a drive' ),
+				array( 'traditional_photographer' => 1, 'candid_photographer' => 1, 'traditional_videographer' => 1, 'cinematographer' => 1 ),
+			),
+			array(
+				'Pre-Wedding Shoot',
+				'pre_wedding',
+				'Local pre-wedding shoot with reels.',
+				array( array( 'Pre-Wedding Shoot – Local', 1 ), array( 'Instagram Reels', 1 ) ),
+				array( 'Edited high-resolution photographs in an online gallery', 'Pre-wedding film with music', 'Instagram reels, ready to post' ),
+				array( 'candid_photographer' => 1, 'cinematographer' => 1 ),
+			),
+		);
+		foreach ( $specs as $i => $spec ) {
+			$lines = array();
+			foreach ( $spec[3] as $l ) {
+				$svc = $find( $l[0] );
+				if ( $svc ) {
+					$lines[] = array( $svc, $l[1] );
+				}
+			}
+			if ( ! $lines ) {
+				continue;
+			}
+			$pid = Db::insert(
+				'quote_packages',
+				array(
+					'name'         => $spec[0],
+					'event_type'   => $spec[1],
+					'description'  => $spec[2],
+					'deliverables' => wp_json_encode( $spec[4] ),
+					'coverage'     => wp_json_encode( array_intersect_key( $spec[5], array_flip( $roles ) ) ),
+					'is_active'    => 1,
+					'sort'         => $i,
+				),
+				$studio_id
+			);
+			if ( is_wp_error( $pid ) ) {
+				continue;
+			}
+			foreach ( $lines as $j => $l ) {
+				Db::insert(
+					'quote_package_items',
+					array(
+						'package_id'  => $pid,
+						'service_id'  => (int) $l[0]->id,
+						'category'    => $l[0]->category,
+						'name'        => $l[0]->name,
+						'description' => $l[0]->description,
+						'qty'         => $l[1],
+						'rate'        => $l[0]->price,
+						'unit'        => $l[0]->unit,
+						'sort'        => $j,
+					),
+					$studio_id
+				);
+			}
+		}
 	}
 
 	public static function default_deliverable_templates() {

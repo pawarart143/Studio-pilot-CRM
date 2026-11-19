@@ -35,6 +35,9 @@ export type AppConfig = {
   enquiry_budgets: Dict;
   enquiry_heard_from: Dict;
   enquiry_statuses: Dict;
+  quote_coverage_roles: Dict;
+  quote_item_kinds: Dict;
+  quote_deliverable_presets: string[];
 };
 export type Member = {
   id: number;
