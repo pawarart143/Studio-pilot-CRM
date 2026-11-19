@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Briefcase, CalendarClock, Check, FileText, Mail, MapPin, MoreHorizontal, Pencil, Phone, PhoneCall, Trash2, AlertTriangle, Inbox } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { fmtDate, fmtDateTime, inr, phoneDisplay, telLink, dayjs, fromNow } from '@/lib/format';
+import { fmtDate, fmtDateTime, inr, phoneDisplay, telLink, dayjs, fromNow, eventDays, eventDayCount } from '@/lib/format';
 import { callTone, priorityTone, quoteTone, stageTone } from '@/lib/tones';
 import { Badge, Button, Card, CardHeader, ErrorState, Menu, MenuItem, PageLoader, Tabs, useUi, Input, Modal, Field } from '@/components/ui';
 import { FollowupModal, InfoRow, LogCallModal, NoteBox, Timeline, WaButton } from '@/components/shared';
@@ -140,6 +140,18 @@ export default function LeadDetail() {
               <InfoRow label="Type">{l.event_type ? config.event_types[l.event_type] : null}</InfoRow>
               <InfoRow label="Date">{fmtDate(l.event_date)}</InfoRow>
               <InfoRow label="End date">{l.event_end_date ? fmtDate(l.event_end_date) : null}</InfoRow>
+              <InfoRow label={eventDayCount(l.event_date, l.event_end_date) > 1 ? `Event dates (${eventDayCount(l.event_date, l.event_end_date)} days)` : 'Event dates'}>
+                {eventDays(l.event_date, l.event_end_date).length ? (
+                  <span className="flex flex-col gap-0.5">
+                    {eventDays(l.event_date, l.event_end_date).map((d, i) => (
+                      <span key={d}>
+                        {eventDayCount(l.event_date, l.event_end_date) > 1 && <span className="text-faint">Day {i + 1} · </span>}
+                        {fmtDate(d)}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </InfoRow>
               <InfoRow label="Duration">{l.event_duration}</InfoRow>
               <InfoRow label="Venue">{l.venue ? <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{l.venue}</span> : null}</InfoRow>
             </div>
