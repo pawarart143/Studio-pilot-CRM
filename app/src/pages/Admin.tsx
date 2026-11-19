@@ -168,6 +168,7 @@ function GoogleSettings() {
             <li>Create credentials → OAuth client ID → Web application.</li>
             <li>Authorised JavaScript origin: <Copy text={q.data.google_origin} /></li>
             <li>Authorised redirect URI: <Copy text={q.data.google_redirect} /></li>
+            {q.data.gcal_redirect && <li>For Google Calendar sync, add a second redirect URI: <Copy text={q.data.gcal_redirect} /> and enable the <b>Google Calendar API</b> in the same Google Cloud project. Studios then connect their own calendar in Settings → Google Calendar.</li>}
             <li>Paste the Client ID and Client secret here and save.</li>
           </ol>
           <div className="space-y-4">
