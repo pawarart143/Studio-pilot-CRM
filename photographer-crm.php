@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       ShootPilot (Photographer CRM)
- * Description:       Multi-studio CRM for photographers: leads, pipeline, calling, quotations, bookings, payments, deliverables, client portal, calendar, team, tasks and reports. Open it at /crm.
+ * Description:       Multi-studio CRM for photographers: leads, pipeline, calling, quotations, bookings, payments, deliverables, client portal, calendar, team, tasks, reports and subscription billing. Open it at /crm.
  * Version:           0.6.0-teamaccess
  * Requires at least: 6.2
  * Requires PHP:      7.4

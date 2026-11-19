@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
 ?>
 <section class="section features" id="features" aria-labelledby="feat-title">
 	<div class="wrap">
-		<?php Landing::heading( 'Features', 'Built around how photography studios actually work.', 'Ten connected modules, one login. Every feature below is live in ShootPilot today.', 'feat-title' ); ?>
+		<?php Landing::heading( 'Features', 'Built around how photography studios actually work.', 'Connected modules, one login. Every feature below is live in ShootPilot today.', 'feat-title' ); ?>
 		<div class="bento">
 
 			<article class="fc fc-wide">
@@ -29,7 +29,7 @@ defined( 'ABSPATH' ) || exit;
 
 			<article class="fc">
 				<span class="fc-ic"><?php echo Landing::icon( 'message' ); // phpcs:ignore ?></span><h3>WhatsApp Integration</h3>
-				<p>Send quotations, payment links and reminders on WhatsApp in one tap using ready templates. On Professional and above, connect the WhatsApp Cloud API to send straight from the CRM.</p>
+				<p>Send quotations, payment links, portal PINs and reminders on WhatsApp in one tap using ready templates filled with the client's details. Included in Professional and Business.</p>
 				<div class="fc-ui ui-wa" aria-hidden="true"><p>Hi Riya, here is your quotation for the wedding on 22-11-2026 ✨</p><small>Template · Quotation</small></div>
 			</article>
 
@@ -47,7 +47,7 @@ defined( 'ABSPATH' ) || exit;
 
 			<article class="fc">
 				<span class="fc-ic"><?php echo Landing::icon( 'card' ); // phpcs:ignore ?></span><h3>Payment Tracking</h3>
-				<p>Monitor advances, installments, outstanding balances and receipts. Collect online with Razorpay payment links.</p>
+				<p>Monitor advances, installments, outstanding balances and receipts. On Professional and Business, collect online with Razorpay payment links on your own account.</p>
 				<div class="fc-ui ui-pay" aria-hidden="true"><div class="pay-top"><small>Paid ₹1,50,000 of ₹2,41,900</small><b>62%</b></div><i><em style="width:62%"></em></i></div>
 			</article>
 

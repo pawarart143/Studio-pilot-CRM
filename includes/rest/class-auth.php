@@ -303,6 +303,8 @@ class Auth extends Base {
 				'plan'            => $studio->plan,
 				'plan_info'       => Plans::get( $studio->plan ),
 				'plan_expires_at' => $studio->plan_expires_at,
+				'trial_ends_at'   => isset( $studio->trial_ends_at ) ? $studio->trial_ends_at : null,
+				'billing'         => Plans::status( $studio ),
 				'status'          => $studio->status,
 				'settings'        => $settings,
 			);

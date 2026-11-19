@@ -321,6 +321,16 @@ class Team extends Base {
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
+		if ( (int) $m->user_id === get_current_user_id() && isset( $data['status'] ) && 'inactive' === $data['status'] ) {
+			return new \WP_Error( 'validation_failed', 'You cannot deactivate yourself.', array( 'status' => 422 ) );
+		}
+		// Turning a deactivated member with a login back on uses a team login again.
+		if ( $m->user_id && 'inactive' === $m->status && isset( $data['status'] ) && 'inactive' !== $data['status'] ) {
+			$limit = Plans::check( Tenant::studio(), 'members' );
+			if ( is_wp_error( $limit ) ) {
+				return $limit;
+			}
+		}
 		$body         = $this->body( $req );
 		$new_password = isset( $body['password'] ) ? (string) $body['password'] : '';
 		$login_info   = null;
@@ -354,9 +364,6 @@ class Team extends Base {
 					}
 				}
 			}
-		}
-		if ( (int) $m->user_id === get_current_user_id() && isset( $data['status'] ) && 'inactive' === $data['status'] ) {
-			return new \WP_Error( 'validation_failed', 'You cannot deactivate yourself.', array( 'status' => 422 ) );
 		}
 		Db::update( 'members', $id, $data );
 		$b = $this->body( $req );

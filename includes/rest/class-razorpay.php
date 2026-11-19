@@ -85,6 +85,12 @@ class Razorpay extends Base {
 	}
 
 	public function create( $req ) {
+		// Razorpay payment links are a Professional / Business feature. Links made earlier
+		// keep working (status check, cancel and webhook are not gated) so no client payment is lost.
+		$gate = \PCRM\Plans::check( Tenant::studio(), 'razorpay_links' );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
 		$bk = Db::find( 'bookings', (int) $req['id'] );
 		if ( ! $bk ) {
 			return $this->not_found( 'Booking' );

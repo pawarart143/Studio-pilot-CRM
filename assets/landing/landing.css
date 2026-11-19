@@ -560,3 +560,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .soon em { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 1px 6px; margin-left: 4px; border-radius: 99px; background: var(--grey); color: var(--muted); }
 .foot-bot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--muted); }
 @media (max-width: 960px) { .foot-top { grid-template-columns: repeat(2, minmax(0, 1fr)); } .foot-brand { grid-column: 1 / -1; } }
+
+/* v0.6.0: studio operations section */
+.ops-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ops-list { list-style: none; margin: auto 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); display: grid; gap: 6px; font-size: 13px; color: var(--muted, inherit); }
+.ops-list li { display: flex; align-items: center; gap: 8px; }
+.ops-list svg { width: 15px; height: 15px; flex: none; color: #16a34a; }
+@media (max-width: 1080px) { .ops-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .ops-grid { grid-template-columns: 1fr; } }
