@@ -11,8 +11,242 @@ Modules include:
 - crew scheduling for freelancers (v0.5.0)
 - public enquiry form that creates leads (v0.5.0)
 - WhatsApp sharing and settings
+- subscription billing: Starter trial, Professional and Business plans with Razorpay Subscriptions (v0.6.0)
 
 Defaults are INR (₹), India, DD-MM-YYYY, Asia/Kolkata and +91.
+
+## What's new in v0.6.0 (all of the 0.6.0 work in one plugin)
+
+Update with "Replace current with uploaded". Nothing is removed and no data is lost: v0.6.0 combines the eight 0.6.0 updates below into one build. Each one keeps its own database migration option (`pcrm_quote_db_version`, `pcrm_gcal_db_version`, `pcrm_reminders_db_version`, `pcrm_billing_db_version`), so they all run on the first page load after the update, alongside `pcrm_db_version` (still 5).
+
+- **Leads:** every day of a multi-day event is shown on the list and the lead page, not just the first and last date.
+- **Deliverables grouped by client** with a client delivery workspace.
+- **Quotation generator:** step builder, event days, packages, payment plan, premium PDF and client acceptance.
+- **Customizable dashboard:** per-user widgets, order, ranges and reset.
+- **Google Calendar sync** for bookings, tasks, follow-ups and payment reminders.
+- **Email, pop-up and ring-sound reminders** for tasks and follow-ups.
+- **Subscription billing:** Starter (15-day trial, 1 login, 50 leads a month), Professional (2 logins, 250 leads), Business (unlimited), Razorpay Subscriptions and homepage pricing. These plans are the only source of limits.
+- **Team sign-in fix and business access:** Payments, Expenses, Reports, Team, Settings and Plan are for the owner and admins only, checked on the server for every request, and the dashboard's money widgets follow the same rule.
+
+On update, v0.5.0 plans are mapped: Free becomes a Starter trial and Enterprise becomes Business.
+
+## What's new in v0.6.0-deliverables (Deliverables grouped by client)
+
+Update with "Replace current with uploaded". No database changes and nothing is removed.
+
+- **Deliverables → By client** (the new default): one row per client instead of one row per deliverable. Each row shows every booking of that client, how many deliverables are done out of the total, overall progress, the current stage, and how many are overdue or when the next one is due. Status chips, overdue, search and the team member filter still work and decide which clients appear.
+- **Client delivery workspace** (click a client): all deliverables of that client in one place, grouped by booking. Change status and assignment right in the list, edit dates, link and notes, add or delete deliverables, apply a template, send WhatsApp updates, and hide delivered items. Crew who only see their own deliverables see only those here too.
+- **All items** keeps the previous one-row-per-deliverable list.
+- The booking's Deliverables tab links to the client's full delivery workspace.
+
+## What's new in v0.6.0-quotation (Quotation generator)
+
+Update with "Replace current with uploaded". Nothing is removed. Existing quotations keep their numbers, totals and links.
+
+- **Step-by-step builder** (Quotations → New): 1. Client & events, 2. Services & packages, 3. Deliverables & payments, 4. Terms & review. Click any step at any time. The summary on the right updates the total, GST and every payment milestone as you type. Step 4 shows a live preview of exactly what the client will see.
+- **Several events in one quotation:** each day has a name, type, date, time, venue, city, notes and the team you promise (traditional / candid photographer, traditional videographer, cinematographer, drone, assistant, with counts). "Copy to the next day" repeats a day. A quotation made from a lead gets one day per date of the lead.
+- **Packages** (Settings → Quote packages): a package is a set of services with your rates, the deliverables and the team per day. One tap adds it to a quotation; every line stays editable. "Save as package" on the builder turns the current lines into a package. Three starter packages (Wedding – Essentials, Wedding – Signature, Pre-Wedding Shoot) are created from your own price list on update; they are skipped if your catalogue doesn't have matching services.
+- **Lines are grouped** as Packages, Services and Add-ons. Units from your price list (day, album, set) are shown.
+- **GST:** CGST + SGST for clients in your state or IGST for other states, per quotation, with a studio default. Flat or % discount as before.
+- **Payment plan:** up to 6 milestones that must add up to 100% (quick splits 50/30/20, 50/50, 30/40/30…). Amounts follow the total.
+- **Deliverables and "Not included"** lists with one-tap suggestions.
+- **Set once in Settings → Quotes & invoices:** introduction, closing message, terms, default deliverables, "Not included", payment plan, GST type, quotation colour and whether to show the rate of each line.
+- **Premium PDF:** brand band in your quotation colour with logo, event schedule with team, grouped investment table, GST split, amount in words, payment plan with amounts, deliverables, not included, terms, payment details, signature lines and an "Accepted online by …" stamp once accepted.
+- **Client link** (`/crm/q/…`): redesigned page for phone and desktop. The client sees events, investment, payment plan and deliverables, downloads the PDF, asks on WhatsApp (when the studio phone is set), and **accepts by typing their name and ticking the terms**, or declines with a reason. Their message is shown on the quotation. Views are counted (staff who are signed in are not counted). **New client link** makes the old link stop working. Copying the link of a draft marks it Sent.
+- **Timeline** on every quotation: created, edited (with old → new total), sent, opened by client, accepted / declined, client message, PDF downloaded by client, new link.
+- **Convert to booking** now carries over every event day (date, time, venue, city, notes), the quoted services, and the payment plan as the booking's installments. Accepting still moves the lead to Negotiation, and creating the booking still marks the quotation Accepted.
+
+### Database changes (v0.6.0-quotation)
+
+Versioned on its own option `pcrm_quote_db_version` (= 1), separate from `pcrm_db_version`.
+
+| Table | Change |
+|---|---|
+| `pcrm_quotations` | new columns: intro, closing, deliverables, exclusions, payment_schedule (JSON), gst_type, show_prices, package_id, view_count, last_viewed_at, accepted_name, client_note, response_ip_hash |
+| `pcrm_quotation_items` | new columns: kind (package / service / addon), unit |
+| `pcrm_quotation_events` | new: event days per quotation with coverage (team counts) |
+| `pcrm_quote_packages`, `pcrm_quote_package_items` | new: reusable packages |
+
+On update each existing quotation with a date or venue gets one event row from it. Every new table has `studio_id`, and every query is limited to the signed-in studio. Package edits need Settings rights (owner/admin); sales can use packages on quotations.
+
+## What's new in v0.6.0-dashboard (customizable dashboard)
+
+Update with "Replace current with uploaded". Nothing is removed and the database schema does not change.
+
+- **The default dashboard is unchanged.** Anyone who doesn't customize sees exactly the v0.5.0 dashboard, in the same order, with the same numbers.
+- **Customize** (top right of the dashboard) opens an edit panel. The dashboard behind it previews your changes live:
+  - drag widgets to reorder them (or use the up/down arrows, which also work by keyboard and on phones)
+  - hide a widget, or add one from **More widgets**
+  - pick a date range for widgets where it makes sense (for example 6, 12 or 24 months for revenue, "This financial year" for lead sources, next 7 to 90 days for events)
+  - **Save** keeps the layout; **Cancel** throws the changes away; **Reset to default** puts back the standard layout exactly
+- **Saved per user and per studio.** Your layout doesn't change anyone else's dashboard, and a person in two studios can have a different layout in each. It's stored in WordPress user meta (`pcrm_dashboard_layout_<studio id>`).
+- **Widgets.** Everything that was on the dashboard is now a widget (10 lead KPIs, revenue, pending payments, upcoming events, monthly revenue, lead sources, lead conversion, today's follow-ups, upcoming weddings & events, today's tasks, recent activity). New, off by default: conversion rate, bookings confirmed, payments received, expenses (incl. crew), net (collected − expenses), deliverables in progress, upcoming deliverables, open tasks, leads by stage, income vs expenses, outstanding payments, crew schedule, and task load by person.
+- **Permissions are enforced on the server.** Each widget needs the same permissions as the page its data comes from (for example payment widgets need *payments.view*, expense and net widgets also need *expenses.view*, crew schedule needs *crew.view*, task load needs *tasks.view_all*). A role never receives widgets it can't use: they're left out of the list, dropped from saved layouts, and the widget data endpoint answers 403. The crew schedule widget never includes rates. Deliverables and tasks widgets show only your own items unless your role can see everyone's.
+- Each widget has its own loading, empty and error state, so one failed widget doesn't blank the dashboard.
+- API: `GET/PUT/DELETE /wp-json/pcrm/v1/dashboard/layout` and `GET /wp-json/pcrm/v1/dashboard/widgets/<id>?range=<key>`. `GET /dashboard` is unchanged.
+
+## What's new in v0.6.0-gcal (Google Calendar sync)
+
+Update with "Replace current with uploaded". Nothing is removed. The update adds three new tables (see below).
+
+ShootPilot can now put your work into Google Calendar by itself. Each studio connects **its own** Google account in **Settings → Google Calendar**.
+
+- **What goes in (each can be turned on or off, all on by default):**
+  - **Bookings:** one event per event date and venue, so a 3-day wedding with Haldi, Sangeet and Reception gets one event for each. Title is "Event – Client name", the venue is the location, and the description has the booking number, client phone, assigned team and crew, services, notes and a link back to ShootPilot. An event with a start and end time is timed (an end time of 12:00 AM counts as midnight that night), a start time without an end time gets 3 hours, and an event with no time is an all-day event. Reminders: 1 day before plus your chosen time.
+  - **Tasks** with a deadline, at their due time (30 minutes). Done tasks stay with a ✓ and no reminder.
+  - **Calls and follow-ups:** every scheduled follow-up, including the "next call" date you set when logging a call (15 minutes, with the lead's phone number).
+  - **Payment reminders:** every installment due date that still has a balance, as an all-day event with the amount due, reminding you at 9 AM the day before. It is removed once the installment is paid, and updated when it is part paid.
+- **Choose the calendar:** your main calendar or any Google calendar you can add events to. A separate "Shoots" calendar is a good idea. Switching moves ShootPilot's events to the new calendar.
+- **Edits and deletes follow automatically.** Every record has a fixed Google event id, so editing updates the same event and a retry can never make a duplicate. Deleting a task, follow-up or booking event date, cancelling a booking or turning a type off removes its events from Google.
+- **Your other Google events are never touched.** ShootPilot only changes events it created (it keeps a list of them and tags them).
+- **One way only:** changes made in Google are not copied back into ShootPilot. If you delete a ShootPilot event in Google, it comes back the next time that record changes.
+- **Never blocks the CRM.** Saving in ShootPilot never waits for Google. Changes are queued and sent in the background, usually within a minute. If Google is down or rate-limits, ShootPilot retries with back-off (1 minute up to 12 hours, 8 tries) and shows any problems with a **Retry all** button. If the Google sign-in expires or is revoked, Settings shows **Reconnect Google**; nothing is lost, and the waiting changes are sent after you reconnect.
+- **Sync window:** items from 30 days ago up to 2 years ahead. Older items already in Google are left as they are.
+- **Disconnect** stops syncing and revokes ShootPilot's access. Tick "Also delete the events ShootPilot added" to clean them out of Google.
+- **Who can use it:** studio owners and admins. Other roles don't see the tab, and the server refuses their requests.
+- **Security:** the Google refresh and access tokens are stored encrypted (libsodium, key from your wp-config.php security keys), never sent to the browser, and each studio's tokens are separate.
+
+### Set-up (once, by the platform super admin)
+
+Google Calendar uses the same Google OAuth client as "Google sign-in" (see below).
+
+1. In [Google Cloud](https://console.cloud.google.com/), in the same project as your sign-in client, go to **APIs & Services → Library** and enable the **Google Calendar API**.
+2. In **Credentials**, open your OAuth client and add a second **Authorised redirect URI**: `https://your-site.com/?pcrm_gcal=callback` (Super Admin → Google sign-in shows the exact address to copy).
+3. In the **OAuth consent screen**, add the scopes `.../auth/calendar.events` and `.../auth/calendar.calendarlist.readonly`. These are "sensitive" scopes: while the app is in **Testing**, only the Google accounts you list as test users can connect, and their sign-in expires after 7 days. To let any studio connect, publish the app and submit it for Google's verification.
+4. If you haven't already, paste the Client ID and secret in Super Admin → Google sign-in. Alternatively put `define( 'PCRM_GCAL_CLIENT_ID', '...' );` and `define( 'PCRM_GCAL_CLIENT_SECRET', '...' );` in wp-config.php to use a separate client for the calendar.
+
+Then each studio goes to Settings → Google Calendar → **Connect Google Calendar**.
+
+ShootPilot sends changes through WP-Cron. If your host has `DISABLE_WP_CRON` set, add a real cron job that opens `https://your-site.com/wp-cron.php` every 5 minutes.
+
+### Database changes (v0.6.0-gcal)
+
+New tables `pcrm_gcal_accounts` (one per studio: Google email, encrypted tokens, calendar, settings, status), `pcrm_gcal_links` (record → Google event id, calendar and a hash of what was sent) and `pcrm_gcal_queue` (pending and failed changes with retry times). No existing table is changed. These tables have their own version option (`pcrm_gcal_db_version`), separate from the main DB version.
+
+## What's new in v0.6.0-reminders (task and follow-up reminders)
+
+Update with "Replace current with uploaded". Nothing is removed. One new table is added (`pcrm_notifications`), tracked by its own option `pcrm_reminders_db_version`, so it does not touch the shared DB version.
+
+**Who gets what.** The person a task or call follow-up is assigned to gets:
+- an **email when it is scheduled for them** (new, reassigned or rescheduled, including "next call" from Log call),
+- a **reminder email before it is due** (default 30 minutes, Settings → Reminders, 5 minutes to 1 day),
+- an **in-app pop-up and a ring sound** at the reminder time and again when it is due,
+- everything listed under the **bell icon**: *Due* (overdue and due today), *Alerts* (history, unread count, mark all read) and *Preferences*.
+
+**Rules.**
+- Nothing is sent for completed, cancelled, deleted, reassigned or rescheduled items: each email re-checks the item just before sending.
+- No duplicates: every reminder is unique per item, event, person and due time in the database, and each email is claimed before it is sent. Tested with four scheduler processes running at once.
+- If the "scheduled" email went out inside the reminder window, the separate reminder email is skipped (one email, not two).
+- Roles: reminders only go to people who can open the item (tasks need Tasks access; follow-ups need Leads access). Team members without a login, inactive members and other studios get nothing.
+- Sample data never sends emails.
+- Times use the studio time zone (Asia/Kolkata) and DD-MM-YYYY, even if WordPress is on UTC.
+
+**Ring sound.** Browsers only allow sound after you click or type on the page, so ShootPilot never plays sound on page load. Until you click, the alert shows on screen with "Sound is blocked until you click anywhere on the page". Each reminder rings once (the first open tab claims it; other tabs and devices stay quiet). Reminders more than 15 minutes overdue show without sound.
+
+**Per-user preferences** (bell → Preferences, or Settings → My profile): scheduled emails, reminder emails, pop-ups, ring sound, desktop notifications, and **Send test** email. Saved per user on the server.
+
+**Settings → Reminders (owner/admin):** reminder time, studio-wide email switch, when the scheduler last ran, emails sent / waiting / failed in the last 7 days, last error, and whether an SMTP plugin is active.
+
+**Emails** are HTML with the studio logo (or name), enquiry-form brand colour, details, an "Open task / Open follow-up call" button that goes straight to the item, and a plain-text version. Sender name is the studio name; Reply-To is the studio email.
+
+### Make sure emails arrive (please do this on your server)
+
+1. **Install an SMTP plugin** such as WP Mail SMTP, FluentSMTP or Post SMTP and connect it to Gmail / Google Workspace, Zoho Mail, Brevo or your host's mailbox. Without one, many hosts drop or spam-folder WordPress mail.
+2. Press **Send test** (bell → Preferences) and check the inbox and spam folder.
+3. **Add a real cron job** every 5 minutes, so reminders do not wait for someone to visit the site: `wget -q -O - "https://your-site.com/wp-cron.php?doing_wp_cron" >/dev/null 2>&1`. Then you may add `define('DISABLE_WP_CRON', true);` to wp-config.php. The open CRM also creates in-app alerts on its own every minute, even if cron is late.
+
+### Database changes (v0.6.0-reminders)
+
+| Table | Purpose |
+|---|---|
+| `pcrm_notifications` | One row per reminder: studio, member, item (task / follow-up), event (assigned / reminder / due), due time, email status (pending, sending, sent, failed, skipped), alerted and read times. Unique on studio + dedupe key. |
+
+Preferences are user meta `pcrm_notify_prefs`. Studio settings gain `reminder_lead_minutes` (30) and `reminder_emails` (on).
+
+## What's new in v0.6.0-teamaccess (team sign-in and business access)
+
+Update with "Replace current with uploaded". No database changes.
+
+**Team sign-in fixes**
+- **Password always known.** When you add a member with "Let them sign in" and leave the password blank, ShootPilot now shows the generated password once after saving, with Copy and WhatsApp share. Before, the password was only in the invite email, so if the server could not send email the member could never sign in.
+- **Set a new password.** Team → Edit member now has "Set a new password" for members who already have a login. Logins that the person also uses for another studio, WordPress administrators, and the owner's login (unless you are the owner) can't be changed from here.
+- **Email change keeps the login working.** Changing a member's email now changes the email they sign in with too.
+- **No more office lock-out.** Sign-in used to count every attempt, including successful ones, from one IP address, so a studio sharing one internet connection was blocked after 10 sign-ins in 15 minutes. Now only wrong passwords count (20 per IP, 8 per account, per 15 minutes).
+- **Deactivated members** see "Your team access has been turned off" instead of the "Set up your studio" page.
+
+**Business access is owner and admin only**
+- Sales, production manager, photographer, cinematographer, editor and album designer no longer get Payments & Expenses, Reports, Team, Settings (studio, quotes and invoices, services, portal, enquiry form, WhatsApp, online payments, plan, data) or the plan card. The whole Business section is gone from their sidebar and opening those pages shows "You don't have access".
+- The server refuses those APIs with 403 for team roles, money is removed from bookings, clients and the dashboard, and `Permissions::business_permissions()` lists the keys that team roles can never get.
+- Production managers still see teammates' phone numbers and the availability check when assigning shoots. Sales no longer see payment status.
+- Team login limits come only from the billing plans (Starter 1, Professional 2, Business unlimited). This update adds no limit of its own. Team roles still see the trial or plan-ended banner, so they know why saving is paused.
+
+## What's new in v0.6.0-billing (Subscription billing and plans)
+
+Update with "Replace current with uploaded". Nothing is removed. The update adds four tables and four columns on studios (see "Database changes (billing)").
+
+### Plans
+
+| | Starter | Professional | Business |
+|---|---|---|---|
+| Price | Free for 15 days | ₹599/month or ₹4,999/year | ₹999/month or ₹7,999/year |
+| Team logins | 1 | 2 | Unlimited |
+| New leads a month | 50 | 250 | Unlimited |
+| Leads, pipeline, calling, follow-ups, quotations (GST, PDF), bookings, calendar, tasks, payments, receipts, expenses, reports | ✔ | ✔ | ✔ |
+| WhatsApp share with ready templates | – | ✔ | ✔ |
+| Razorpay payment links (studio's own account) | – | ✔ | ✔ |
+
+- Plans live in the database (`pcrm_plans`). The super admin can change names, prices, limits, trial days and features in **Super Admin → Plans**. The homepage and the Billing page read from there.
+- Crew Scheduling, the enquiry form, the client portal, deliverables and the team directory stay on every plan. Crew and team members **without a login** are unlimited.
+- Platform support logins (super admin) don't count as team logins.
+
+### Limits are enforced on the server
+
+- **New leads a month** counts every lead created this calendar month (Asia/Kolkata), from the form, import, the public enquiry form or the API. Over the limit, the API answers HTTP 402 with a clear message; the enquiry form keeps the submission "on hold" (as before) so nothing is lost.
+- **Team logins** are checked when you give a member a login and when you turn a deactivated member with a login back on.
+- **WhatsApp templates** (`whatsapp/render`, `whatsapp/send`, creating or editing templates) and **creating Razorpay payment links** answer 402 on Starter. Plain WhatsApp chat buttons still work, and payment links made earlier can still be checked, cancelled and paid (webhook), so no client payment is lost.
+- The app shows an **Upgrade your plan** box with the server's message whenever this happens.
+
+### When the trial or a paid plan ends
+
+Default: **read-only**. The studio can sign in, view everything and export, but adding, editing and deleting answer 402 until they choose a plan. Billing, sign-in and profile keep working. Data is never deleted.
+
+To make Starter free forever instead, set **Super Admin → Subscription billing → "When a trial or paid plan ends" → Keep working on Starter limits** (option `pcrm_billing_after_expiry` = `starter_limits`). No code change needed.
+
+A paid plan keeps working for 3 days after its period ends while Razorpay retries a renewal (state "Payment due").
+
+### Billing page (`/crm/billing`, owners and admins)
+
+Current plan, trial days left, renewal date, usage meters (team logins, new leads this month), the three plans with a monthly/yearly switch, **Upgrade** (Razorpay Checkout), **Turn off auto-renew**, and billing history. Other roles see a banner when the trial is ending or has ended.
+
+### Razorpay Subscriptions (ShootPilot's own account)
+
+These are the **platform** keys that collect ShootPilot's subscription money. They are completely separate from each studio's keys in Settings → Online payments (which collect the studio's client payments) and from its webhook secret.
+
+1. Razorpay Dashboard → switch to **Test Mode** → Account & Settings → API Keys → Generate key.
+2. ShootPilot → **Super Admin → Subscription billing**: paste Key ID, Key Secret and choose a webhook secret (12+ characters). Or put them in wp-config.php: `PCRM_BILLING_KEY_ID`, `PCRM_BILLING_KEY_SECRET`, `PCRM_BILLING_WEBHOOK_SECRET`.
+3. Razorpay → Webhooks → Add: URL `https://your-site.com/wp-json/pcrm/v1/billing/webhook`, the same secret, events `subscription.authenticated`, `subscription.activated`, `subscription.charged`, `subscription.pending`, `subscription.halted`, `subscription.cancelled`, `subscription.completed`, `subscription.paused`, `subscription.resumed`.
+4. Upgrade a test studio from its Billing page and pay with a Razorpay test card or UPI `success@razorpay`. The plan activates right after checkout (signature checked on the server) and again from the webhook; whichever comes first wins.
+5. Repeat with live keys (`rzp_live_…`).
+
+How it works: the Razorpay plan (₹ amount, monthly/yearly) is created automatically on the first checkout and remembered per key and price. Each charge (`subscription.charged`) extends "paid until" to Razorpay's `current_end` and adds a row to billing history. Webhooks are signature-checked, de-duplicated by event id, ignored for subscriptions this site didn't create, and can never shorten paid time. Switching plan starts the new subscription right away and cancels the old one (no proration). Turning off auto-renew cancels at the end of the paid period.
+
+### Database changes (billing)
+
+Versioned with its own option `pcrm_billing_db_version` (not `PCRM_DB_VERSION`).
+
+| Table / column | Purpose |
+|---|---|
+| `pcrm_plans` | Plan definitions (price monthly/yearly, trial days, logins, leads, features) |
+| `pcrm_subscriptions` | Each Razorpay subscription a studio starts (status, cycle, current period, mode test/live) |
+| `pcrm_billing_payments` | Subscription payments (billing history) |
+| `pcrm_billing_events` | Webhook events already handled |
+| `pcrm_studios`: `trial_ends_at`, `billing_cycle`, `billing_status`, `subscription_id` | Trial end and the subscription in force |
+
+**Existing studios on update:** Free → Starter with a fresh 15-day trial from the update day; old paid Starter → Professional (same expiry); Enterprise → Business; Professional stays. A paid plan that had already expired gets a fresh 15-day trial instead of becoming read-only at once.
+
+### Homepage
+
+Pricing shows the three plans from the database with the monthly/yearly switch (yearly shows the per-month price and the yearly total). A new "Studio operations" section covers Crew Scheduling, the public enquiry form, the PIN-protected client portal, the team directory with service-wise crew, deliverables and admin-controlled payments. FAQ answers were updated for the trial, plans, client portal and enquiry form.
 
 ## What's new in v0.5.0 (Crew Scheduling and Public Enquiry Form)
 
@@ -119,7 +353,7 @@ ShootPilot includes a public marketing homepage, served by the plugin outside yo
 - It is always available at `https://your-site.com/shootpilot/`.
 - All buttons link to the real CRM: **Start Free / Get Started** → `/crm/register`, **Login** → `/crm/login`. Signed-in users see **Open dashboard** → `/crm/`.
 - On the same wp-admin page you can set the Contact email, About and Terms URLs, and Instagram, Facebook and YouTube links. Footer links without a URL show "Soon". Privacy Policy uses Settings → Privacy.
-- **Pricing is placeholder.** The amounts come from `includes/class-plans.php` (Starter, Professional, and Enterprise shown as "Business"). Yearly = 10 × monthly. Change them there, or with the `pcrm_landing_pricing` filter.
+- **Pricing** comes from the plans table (Super Admin → Plans). You can also change the cards with the `pcrm_landing_pricing` filter.
 - **Testimonials are placeholders**, clearly labelled on the page. Replace them in `includes/landing/sections/testimonials.php` or with the `pcrm_landing_testimonials` filter, only with real quotes you have permission to use.
 - Files: `includes/class-landing.php`, `includes/landing/` (one partial per section, product previews in `mock/`), `assets/landing/landing.css` and `landing.js`. No build step.
 
@@ -160,7 +394,7 @@ A Google account whose email already exists signs in to that account. A new emai
 
 ## Razorpay (online payments from clients)
 
-Each studio connects **its own** Razorpay account, so money goes straight to the studio.
+Professional and Business plans. Each studio connects **its own** Razorpay account, so money goes straight to the studio.
 
 1. In the Razorpay Dashboard, go to Account & Settings → **API Keys** and generate a key.
 2. In ShootPilot, go to Settings → **Online payments** and paste the Key ID and Key Secret. Choose a webhook secret (any strong password) and save.
@@ -175,8 +409,8 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 
 ## WhatsApp
 
-- **Without any setup:** every WhatsApp button opens WhatsApp (phone or WhatsApp Web) with the message already typed. You press send. This works on every plan.
-- **WhatsApp Cloud API (Professional and Enterprise plans):** ShootPilot can send directly. Settings → WhatsApp → "How to get these from Meta" lists the steps:
+- **Without any setup:** on Professional and Business, WhatsApp buttons open WhatsApp (phone or WhatsApp Web) with the message already typed from a template. You press send. On Starter, chat buttons open WhatsApp without a template.
+- **WhatsApp Cloud API (Professional and Business plans):** ShootPilot can send directly. Settings → WhatsApp → "How to get these from Meta" lists the steps:
   1. Create a Business app on developers.facebook.com and add the WhatsApp product.
   2. Add and verify a business number. This number can't stay on the normal WhatsApp app.
   3. Copy the Phone Number ID.
@@ -191,16 +425,19 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 | Feature | Status |
 |---|---|
 | Quotation and receipt PDFs (₹, logo) | Working, tested |
+| Quotation generator (v0.6.0) | Working. Tested by API (59 checks) and in the browser: create from a lead, package, extra event day, payment plan, edit, PDF, copy link, client accept and decline on a phone, convert to booking with events, services and installments, two studios kept apart, role limits, upgrade from v0.5.0 with data unchanged |
 | WhatsApp share links with templates | Working, tested |
 | Client portal with PIN (v0.4.1) | Working. Tested on a fresh install and an install upgraded from v0.3.0: generate, view, verify, wrong PIN, refresh, second device, regenerate, disable, and two studios kept apart |
 | Crew Scheduling (v0.5.0) | Working. Tested by API (59 checks) and in the browser on a fresh install and an upgraded install, including clashes, override, reassign, payments, Reports and role limits |
 | Public enquiry form (v0.5.0) | Working. Tested by API (58 checks) and on a phone-size browser: steps, show/hide, multi-day, lead creation, UTM, duplicate review and merge, rate limits, two studios kept apart |
 | Cloudflare Turnstile on the enquiry form | Built, **not tested with real Turnstile keys** |
 | New-enquiry email | Uses `wp_mail`; only sent if the studio has an email and the server can send email |
+| Task and follow-up reminders (v0.6.0) | Emails tested end to end through `wp_mail` → PHPMailer → SMTP to a local test mail server (61 checks). **Delivery to real inboxes depends on your server's mail setup and is not verified.** Ring sound and pop-ups tested in Chromium. |
 | WhatsApp Cloud API sending | Built, **not tested against Meta** (no credentials yet) |
 | Razorpay payment links and webhook | Built and tested against simulated Razorpay responses, including webhook signature checks and duplicate webhooks. **Not yet tested with real Razorpay keys.** Try it with Test Mode keys first. |
 | Google sign-in | Built and tested against simulated Google responses. **Not yet tested with a real Google client ID.** |
-| Plan billing for studios | Not included. The super admin sets plans by hand. |
+| Google Calendar sync (v0.6.0-gcal) | Built and tested end to end against a stand-in Google server that checks requests the way Google does (connect, create, edit, delete for all four types, multi-day bookings, outages, rate limits, expired tokens, calendar switch, disconnect, two studios kept apart). **Not yet tested against real Google** (needs a Google OAuth client with the Calendar API enabled). |
+| Subscription billing (Razorpay Subscriptions, v0.6.0) | Built. Tested against a simulated Razorpay API and signed test webhooks (88 API checks) and in the browser with a simulated Checkout. **Not yet tested against real Razorpay test keys.** |
 | Email (reset, invites) | Uses WordPress `wp_mail`, so it needs working email on the server |
 
 ## Time zone
@@ -209,12 +446,7 @@ Dates such as "today" use the studio's time zone (Asia/Kolkata by default), even
 
 ## Plans
 
-Plans are Free, Starter, Professional and Enterprise. Their limits are in `includes/class-plans.php`:
-- team logins
-- leads per month
-- WhatsApp Cloud API
-
-Crew members without a login are unlimited. When a plan expires, the studio falls back to Free limits.
+Starter (15-day trial), Professional and Business. See "What's new in v0.6.0-billing" above. Limits: team logins, new leads a month, and the features WhatsApp templates, Razorpay payment links and WhatsApp Cloud API.
 
 ## WP-CLI
 

@@ -31,8 +31,12 @@ abstract class Base {
 					}
 					return $res;
 				},
-				'permission_callback' => function () use ( $perm ) {
-					return self::check( $perm );
+				'permission_callback' => function ( $req ) use ( $perm, $path ) {
+					$ok = self::check( $perm );
+					if ( true === $ok && 'public' !== $perm && 'super' !== $perm ) {
+						$ok = self::check_plan( $req, $path );
+					}
+					return $ok;
 				},
 			)
 		);
@@ -65,6 +69,37 @@ abstract class Base {
 			}
 		}
 		return new \WP_Error( 'forbidden', 'You do not have permission to do this.', array( 'status' => 403 ) );
+	}
+
+	/**
+	 * Route prefixes that keep working when a trial or plan has ended in
+	 * read-only mode, so the studio can still sign in, switch studio and pay.
+	 */
+	public static function read_only_allowed() {
+		return apply_filters( 'pcrm_read_only_allowed_routes', array( '/billing', '/auth', '/me', '/payment-links', '/notifications' ) );
+	}
+
+	/**
+	 * Read-only mode after a trial or plan ends: reading and exporting work,
+	 * adding and changing data answers HTTP 402 with an upgrade message.
+	 * Platform super admins (support) are not blocked.
+	 */
+	public static function check_plan( $req, $path ) {
+		$method = $req instanceof \WP_REST_Request ? $req->get_method() : 'GET';
+		if ( in_array( $method, array( 'GET', 'HEAD', 'OPTIONS' ), true ) ) {
+			return true;
+		}
+		foreach ( self::read_only_allowed() as $prefix ) {
+			if ( 0 === strpos( $path, $prefix ) ) {
+				return true;
+			}
+		}
+		$studio = Tenant::studio();
+		if ( ! $studio || Tenant::is_super_admin() ) {
+			return true;
+		}
+		$err = \PCRM\Plans::read_only_error( $studio );
+		return $err ? $err : true;
 	}
 
 	protected function body( $req ) {

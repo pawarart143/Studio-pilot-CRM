@@ -1,23 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Check, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useForm, validate } from '@/lib/form';
 import { useUrlState } from '@/lib/hooks';
-import { fmtDate, inr } from '@/lib/format';
+import { fmtDate, fmtDateTime, inr } from '@/lib/format';
 import { Badge, Button, Card, CardHeader, Checkbox, EmptyState, ErrorState, Field, Input, Modal, PageHeader, SearchInput, Select, TableSkeleton, Tabs, Textarea, Toggle, useUi } from '@/components/ui';
 import { PortalCard, portalStatus } from '@/components/delivery';
 import { Link } from 'react-router-dom';
 import EnquirySettings from '@/pages/enquiry/EnquirySettings';
+import PackagesTab from '@/pages/quotations/PackagesTab';
+import { LinesEditor, ScheduleEditor, linesFrom, milestonesFrom, num as qnum, type Milestone } from '@/pages/quotations/parts';
+import GoogleCalendarTab from '@/pages/settings/GoogleCalendarTab';
+import { NotificationPrefs } from '@/components/Notifications';
 
 export default function Settings() {
   const { can, member } = useAuth();
   const admin = can('settings.edit');
   const [f, setF] = useUrlState({ tab: admin ? 'studio' : 'profile' });
   const tabs: [string, string][] = admin
-    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['whatsapp', 'WhatsApp'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
+    ? [['studio', 'Studio'], ['business', 'Quotes & invoices'], ['services', 'Services & prices'], ['packages', 'Quote packages'], ['deliverables', 'Deliverable templates'], ...(can('portal.manage') ? ([['portal', 'Client portal']] as [string, string][]) : []), ...(can('enquiry.manage') ? ([['enquiry', 'Enquiry form']] as [string, string][]) : []), ['reminders', 'Reminders'], ['whatsapp', 'WhatsApp'], ['calendar', 'Google Calendar'], ['payments', 'Online payments'], ['profile', 'My profile'], ['plan', 'Plan'], ['data', 'Data']]
     : [['profile', 'My profile']];
   const tab = tabs.some(([k]) => k === f.tab) ? f.tab : tabs[0][0];
   return (
@@ -29,10 +33,13 @@ export default function Settings() {
           {tab === 'studio' && <StudioTab />}
           {tab === 'business' && <BusinessTab />}
           {tab === 'services' && <ServicesTab />}
+          {tab === 'packages' && <PackagesTab />}
           {tab === 'deliverables' && <TemplatesTab />}
           {tab === 'portal' && <PortalsTab />}
           {tab === 'enquiry' && <EnquirySettings />}
+          {tab === 'reminders' && <RemindersTab />}
           {tab === 'whatsapp' && <WhatsAppTab />}
+          {tab === 'calendar' && <GoogleCalendarTab />}
           {tab === 'payments' && <RazorpayTab />}
           {tab === 'profile' && <ProfileTab key={member.id} />}
           {tab === 'plan' && <PlanTab />}
@@ -58,6 +65,71 @@ function useSaveSettings() {
       return false;
     }
   };
+}
+
+/* ---------- Reminders (owner/admin) ---------- */
+const LEAD_OPTIONS: [string, string][] = [['5', '5 minutes'], ['10', '10 minutes'], ['15', '15 minutes'], ['30', '30 minutes (recommended)'], ['60', '1 hour'], ['120', '2 hours'], ['240', '4 hours'], ['1440', '1 day']];
+
+function RemindersTab() {
+  const { studio } = useAuth();
+  const s = studio.settings || {};
+  const save = useSaveSettings();
+  const [lead, setLead] = useState(String(s.reminder_lead_minutes ?? 30));
+  const [emails, setEmails] = useState(s.reminder_emails !== false);
+  const [busy, setBusy] = useState(false);
+  const st = useQuery({ queryKey: ['reminder-status'], queryFn: () => api.get('notifications/status'), refetchInterval: 60_000 });
+  const leadOpts = LEAD_OPTIONS.some(([k]) => k === lead) ? LEAD_OPTIONS : [...LEAD_OPTIONS, [lead, `${lead} minutes`] as [string, string]];
+  const submit = async () => {
+    setBusy(true);
+    await save({ settings: { reminder_lead_minutes: Number(lead), reminder_emails: emails } });
+    st.refetch();
+    setBusy(false);
+  };
+  const d = st.data;
+  const late = d && (d.last_run_ago === null || d.last_run_ago > 20 * 60);
+  return (
+    <div className="grid max-w-4xl gap-8 lg:grid-cols-[1fr_1fr]">
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold">Task and follow-up reminders</h3>
+          <p className="mt-1 text-sm text-muted">The person a task or follow-up is assigned to gets an email when it is scheduled, and a reminder email, a pop-up and a ring sound before it is due. Each person can turn these off for themselves under the bell icon.</p>
+        </div>
+        <Field label="Send the reminder" hint="How long before the due time."><Select value={lead} onChange={(e) => setLead(e.target.value)} options={leadOpts} /></Field>
+        <Toggle checked={emails} onChange={setEmails} label="Send reminder emails for this studio" />
+        <div><Button variant="primary" loading={busy} onClick={submit}>Save</Button></div>
+        <div className="border-t border-line pt-4">
+          <h3 className="mb-1 text-sm font-semibold">My own reminders</h3>
+          <NotificationPrefs />
+        </div>
+      </section>
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold">Email delivery and scheduler</h3>
+        {st.isLoading ? (
+          <TableSkeleton rows={3} cols={2} />
+        ) : st.isError ? (
+          <ErrorState error={st.error} onRetry={() => st.refetch()} />
+        ) : (
+          <div className="space-y-3 text-sm">
+            <div className="rounded-xl border border-line p-3">
+              <div className="flex items-center justify-between"><span className="text-muted">Scheduler last ran</span>{late ? <Badge tone="amber">{d.last_run ? fmtDateTime(d.last_run) : 'Not yet'}</Badge> : <Badge tone="green">{fmtDateTime(d.last_run)}</Badge>}</div>
+              <div className="mt-1.5 flex items-center justify-between"><span className="text-muted">Emails in the last 7 days</span><span className="tabular">{d.emails_7d.sent} sent · {d.emails_7d.pending} waiting · {d.emails_7d.failed} failed</span></div>
+              <div className="mt-1.5 flex items-center justify-between"><span className="text-muted">SMTP plugin</span>{d.smtp_plugin ? <Badge tone="green">{d.smtp_plugin}</Badge> : <Badge tone="amber">None found</Badge>}</div>
+              {d.last_error && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">Last failure ({fmtDateTime(d.last_error.at)}): {d.last_error.message}</p>}
+            </div>
+            {late && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200">The scheduler hasn't run in the last 20 minutes. Reminder emails wait until it does. Add the server cron job below.</p>}
+            <div className="rounded-xl bg-subtle/60 p-3 text-xs leading-relaxed text-muted">
+              <p className="font-semibold text-ink">For reliable reminders</p>
+              <ol className="mt-1 list-decimal space-y-1 pl-4">
+                <li>Install an SMTP plugin such as <b>WP Mail SMTP</b> and connect it to Gmail / Google Workspace, Zoho Mail, Brevo or your host's mailbox. Then press <b>Send test</b> on the left.</li>
+                <li>In your hosting panel (cPanel → Cron Jobs, Hostinger → Cron Jobs), add a job every 5 minutes:<code className="mt-1 block break-all rounded bg-surface px-2 py-1 text-[11px] text-ink">wget -q -O - "{d.cron_url}" &gt;/dev/null 2&gt;&amp;1</code></li>
+                <li>Optionally add <code className="rounded bg-surface px-1">define('DISABLE_WP_CRON', true);</code> to wp-config.php once that job works{d.wp_cron_disabled ? ' (already set on this site)' : ''}.</li>
+              </ol>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
 /* ---------- Client portals (owner/admin) ---------- */
@@ -180,9 +252,17 @@ function BusinessTab() {
     receipt_prefix: s.receipt_prefix || 'RC',
     quote_validity: String(s.quote_validity ?? 15),
     quote_terms: s.quote_terms || '',
+    quote_intro: s.quote_intro || '',
+    quote_closing: s.quote_closing || '',
+    quote_accent: s.quote_accent || '#F3724C',
+    quote_show_prices: s.quote_show_prices !== false,
+    gst_type: s.gst_type === 'inter' ? 'inter' : 'intra',
     bank_details: s.bank_details || '',
     upi_id: s.upi_id || '',
   });
+  const [qDeliverables, setQDeliverables] = useState<string[]>(() => linesFrom(s.quote_deliverables));
+  const [qExclusions, setQExclusions] = useState<string[]>(() => linesFrom(s.quote_exclusions));
+  const [qSchedule, setQSchedule] = useState<Milestone[]>(() => milestonesFrom(s.quote_payment_schedule));
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     const v = f.values;
@@ -190,10 +270,14 @@ function BusinessTab() {
     if (isNaN(Number(v.gst_rate)) || Number(v.gst_rate) < 0 || Number(v.gst_rate) > 28) e.gst_rate = 'Between 0 and 28.';
     if (!/^\d+$/.test(v.quote_validity) || Number(v.quote_validity) < 1) e.quote_validity = 'Number of days.';
     if (v.upi_id && !/^[\w.-]+@[\w.-]+$/.test(v.upi_id)) e.upi_id = 'Looks like name@bank.';
+    if (!/^#[0-9a-f]{6}$/i.test(v.quote_accent)) e.quote_accent = 'Use a colour like #F3724C.';
+    const sum = qSchedule.reduce((a, m) => a + qnum(m.percent), 0);
+    if (qSchedule.some((m) => !m.label.trim() || qnum(m.percent) <= 0)) e.payment_schedule = 'Every milestone needs a name and a percentage.';
+    else if (qSchedule.length && Math.abs(sum - 100) > 0.01) e.payment_schedule = `Milestones add up to ${sum}%. They must add up to 100%.`;
     f.setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
-    await save({ settings: { ...v, gst_rate: Number(v.gst_rate), quote_validity: Number(v.quote_validity) } }, f);
+    await save({ settings: { ...v, gst_rate: Number(v.gst_rate), quote_validity: Number(v.quote_validity), quote_deliverables: qDeliverables.join('\n'), quote_exclusions: qExclusions.join('\n'), quote_payment_schedule: qSchedule.map(({ key, ...m }) => ({ ...m, percent: qnum(m.percent) })) } }, f);
     setBusy(false);
   };
   return (
@@ -202,6 +286,11 @@ function BusinessTab() {
         <h3 className="text-sm font-semibold">GST</h3>
         <Toggle checked={f.values.gst_enabled} onChange={(v) => f.set('gst_enabled', v)} label="Add GST to new quotations by default" />
         {f.values.gst_enabled && <Field label="Default GST rate (%)" error={f.errors.gst_rate} hint="Split as CGST + SGST on documents." className="max-w-[200px]"><Input {...f.bind('gst_rate')} inputMode="decimal" /></Field>}
+        {f.values.gst_enabled && (
+          <Field label="Default GST type" hint="IGST for clients in another state. Can be changed on each quotation.">
+            <Select value={f.values.gst_type} onChange={(e) => f.set('gst_type', e.target.value)} options={[['intra', 'Same state: CGST + SGST'], ['inter', 'Other state: IGST']]} className="max-w-xs" />
+          </Field>
+        )}
       </section>
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Numbering</h3>
@@ -215,6 +304,30 @@ function BusinessTab() {
         <h3 className="text-sm font-semibold">Quotations</h3>
         <Field label="Valid for (days)" error={f.errors.quote_validity} className="max-w-[200px]"><Input {...f.bind('quote_validity')} inputMode="numeric" /></Field>
         <Field label="Default terms & conditions"><Textarea rows={5} {...f.bind('quote_terms')} /></Field>
+        <Field label="Introduction" hint="Opens every new quotation."><Textarea rows={3} {...f.bind('quote_intro')} /></Field>
+        <Field label="Closing message" hint="Shown at the end of every new quotation."><Textarea rows={2} {...f.bind('quote_closing')} /></Field>
+        <div className="flex flex-wrap items-end gap-6">
+          <Field label="Quotation colour" error={f.errors.quote_accent} hint="Used on the PDF and the client page.">
+            <div className="flex items-center gap-2">
+              <input type="color" value={/^#[0-9a-f]{6}$/i.test(f.values.quote_accent) ? f.values.quote_accent : '#F3724C'} onChange={(e) => f.set('quote_accent', e.target.value.toUpperCase())} className="h-9 w-12 cursor-pointer rounded border border-line bg-surface" aria-label="Pick colour" />
+              <Input {...f.bind('quote_accent')} className="w-28 uppercase" maxLength={7} />
+            </div>
+          </Field>
+          <div className="pb-2"><Toggle checked={f.values.quote_show_prices} onChange={(v) => f.set('quote_show_prices', v)} label="Show rate per line by default" /></div>
+        </div>
+        <div>
+          <p className="label">Default deliverables</p>
+          <LinesEditor value={qDeliverables} onChange={setQDeliverables} placeholder="e.g. Edited photos in an online gallery" />
+        </div>
+        <div>
+          <p className="label">Default “Not included” list</p>
+          <LinesEditor value={qExclusions} onChange={setQExclusions} placeholder="e.g. Travel outside the city" />
+        </div>
+        <div>
+          <p className="label">Default payment plan</p>
+          <ScheduleEditor value={qSchedule} onChange={setQSchedule} total={100000} error={f.errors.payment_schedule} />
+          <p className="mt-1 text-2xs text-faint">Amounts above are an example on ₹1,00,000.</p>
+        </div>
       </section>
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Payment details (printed on quotations and receipts)</h3>
@@ -587,6 +700,10 @@ function ProfileTab() {
   };
   return (
     <div className="grid max-w-3xl gap-8 md:grid-cols-2">
+      <section className="space-y-2 md:col-span-2 md:order-last">
+        <h3 className="text-sm font-semibold">Reminders and notifications</h3>
+        <NotificationPrefs />
+      </section>
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">Profile</h3>
         <p className="text-sm text-muted">{me.user?.email} · {config.roles[member.role]}</p>
@@ -607,29 +724,16 @@ function ProfileTab() {
 
 /* ---------- Plan ---------- */
 function PlanTab() {
-  const { studio, config } = useAuth();
-  const plans = Object.entries(config.plans);
-  const lim = (n: number) => (n > 0 ? String(n) : 'Unlimited');
+  const { studio } = useAuth();
+  const b = studio.billing;
   return (
-    <div>
+    <div className="max-w-xl">
       <p className="text-sm">
-        You are on the <b>{studio.plan_info.label}</b> plan{studio.plan_expires_at ? `, valid until ${fmtDate(studio.plan_expires_at)}` : ''}.
+        You are on the <b>{b?.label || studio.plan_info.label}</b> plan
+        {b?.state === 'trial' ? `, free trial with ${b.days_left} ${b.days_left === 1 ? 'day' : 'days'} left` : b?.ends_at ? `, until ${fmtDate(b.ends_at)}` : ''}.
       </p>
-      <p className="mt-1 text-sm text-muted">Online plan payments are not connected yet. To change your plan, contact the platform administrator, who can switch it from the admin panel.</p>
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {plans.map(([k, p]) => (
-          <div key={k} className={clsx('rounded-xl border p-4', k === studio.plan ? 'border-accent ring-1 ring-accent' : 'border-line')}>
-            <div className="flex items-center justify-between"><p className="font-semibold">{p.label}</p>{k === studio.plan && <Badge tone="accent">Current</Badge>}</div>
-            <p className="tabular mt-1 text-2xl font-semibold">{p.price ? inr(p.price) : 'Free'}<span className="text-xs font-normal text-muted">{p.price ? ' / month' : ''}</span></p>
-            <ul className="mt-3 space-y-1.5 text-sm">
-              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600" />{lim(p.members)} team logins (crew without login unlimited)</li>
-              <li className="flex gap-2"><Check className="h-4 w-4 text-emerald-600" />{lim(p.leads_per_month)} new leads / month</li>
-              <li className={clsx('flex gap-2', !p.reports && 'text-faint line-through')}><Check className="h-4 w-4 text-emerald-600" />Reports</li>
-              <li className={clsx('flex gap-2', !p.whatsapp_api && 'text-faint line-through')}><Check className="h-4 w-4 text-emerald-600" />WhatsApp Cloud API sending</li>
-            </ul>
-          </div>
-        ))}
-      </div>
+      <p className="mt-1 text-sm text-muted">See usage, upgrade, pay online and download your billing history on the Billing page.</p>
+      <Link to="/billing" className="mt-4 inline-flex h-9 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white shadow-sm hover:bg-accent/90 dark:text-slate-950">Open Billing & plan</Link>
     </div>
   );
 }

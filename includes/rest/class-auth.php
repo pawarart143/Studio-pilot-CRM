@@ -25,24 +25,41 @@ class Auth extends Base {
 		$this->route( '/me/studio', 'POST', array( $this, 'switch_studio' ), 'public' );
 	}
 
-	private function throttle( $key, $max = 10 ) {
-		$ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'x';
-		$k   = 'pcrm_rl_' . md5( $key . $ip );
-		$n   = (int) get_transient( $k );
+	private function throttle_key( $key ) {
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'x';
+		return 'pcrm_rl_' . md5( $key . $ip );
+	}
+
+	/**
+	 * $count false only checks the limit; the caller records a failure with
+	 * throttle_hit(). Used for sign-in, where a whole studio often shares one
+	 * office IP and successful sign-ins must not lock everyone out.
+	 */
+	private function throttle( $key, $max = 10, $count = true ) {
+		$k = $this->throttle_key( $key );
+		$n = (int) get_transient( $k );
 		if ( $n >= $max ) {
 			return new \WP_Error( 'too_many', 'Too many attempts. Please wait 15 minutes and try again.', array( 'status' => 429 ) );
 		}
-		set_transient( $k, $n + 1, 15 * MINUTE_IN_SECONDS );
+		if ( $count ) {
+			set_transient( $k, $n + 1, 15 * MINUTE_IN_SECONDS );
+		}
 		return true;
+	}
+
+	private function throttle_hit( $key ) {
+		$k = $this->throttle_key( $key );
+		set_transient( $k, (int) get_transient( $k ) + 1, 15 * MINUTE_IN_SECONDS );
 	}
 
 	public function login( $req ) {
 		$b = $this->body( $req );
-		$t = $this->throttle( 'login' );
+		// Failed attempts are limited per IP (20 per 15 minutes) and per account (8).
+		$t = $this->throttle( 'login', 20, false );
 		if ( is_wp_error( $t ) ) {
 			return $t;
 		}
-		$login = isset( $b['email'] ) ? sanitize_text_field( $b['email'] ) : '';
+		$login = isset( $b['email'] ) ? trim( sanitize_text_field( $b['email'] ) ) : '';
 		$pass  = isset( $b['password'] ) ? (string) $b['password'] : '';
 		if ( ! $login || ! $pass ) {
 			return new \WP_Error( 'validation_failed', 'Email and password are required.', array( 'status' => 422 ) );
@@ -53,6 +70,10 @@ class Auth extends Base {
 				$login = $u->user_login;
 			}
 		}
+		$acct = $this->throttle( 'login_acct_' . strtolower( $login ), 8, false );
+		if ( is_wp_error( $acct ) ) {
+			return $acct;
+		}
 		$user = wp_signon(
 			array(
 				'user_login'    => $login,
@@ -62,9 +83,36 @@ class Auth extends Base {
 			is_ssl()
 		);
 		if ( is_wp_error( $user ) ) {
+			$this->throttle_hit( 'login' );
+			$this->throttle_hit( 'login_acct_' . strtolower( $login ) );
 			return new \WP_Error( 'invalid_login', 'Incorrect email or password.', array( 'status' => 401 ) );
 		}
+		// A team member whose access was turned off would otherwise land on
+		// "Set up your studio". Tell them what happened instead.
+		$blocked = $this->membership_block( $user->ID );
+		if ( $blocked ) {
+			wp_logout();
+			return $blocked;
+		}
 		return $this->ok( array( 'ok' => true ) );
+	}
+
+	private function membership_block( $user_id ) {
+		global $wpdb;
+		if ( Tenant::is_super_admin( $user_id ) ) {
+			return null;
+		}
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT m.status AS m_status, s.status AS s_status FROM ' . \PCRM\Installer::table( 'members' ) . ' m JOIN ' . \PCRM\Installer::table( 'studios' ) . ' s ON s.id=m.studio_id WHERE m.user_id=%d', $user_id ) );
+		if ( ! $rows ) {
+			return null; // Not in any studio yet: they may create one.
+		}
+		$active = array_filter( $rows, function ( $r ) {
+			return 'active' === $r->m_status;
+		} );
+		if ( ! $active ) {
+			return new \WP_Error( 'member_inactive', 'Your team access has been turned off. Please ask your studio owner to activate you again.', array( 'status' => 403 ) );
+		}
+		return null;
 	}
 
 	public function signup( $req ) {
@@ -221,6 +269,7 @@ class Auth extends Base {
 			),
 			'is_super'    => Tenant::is_super_admin(),
 			'member'      => $member ? \PCRM\Db::cast( $member ) : null,
+			'access_off'  => ! $member && $this->membership_block( $u->ID ) !== null,
 			'permissions' => $member ? Permissions::for_role( $member->role ) : array(),
 			'studios'     => \PCRM\Db::cast_all( Tenant::memberships( $u->ID ) ),
 			'config'      => Config::all(),
@@ -254,6 +303,8 @@ class Auth extends Base {
 				'plan'            => $studio->plan,
 				'plan_info'       => Plans::get( $studio->plan ),
 				'plan_expires_at' => $studio->plan_expires_at,
+				'trial_ends_at'   => isset( $studio->trial_ends_at ) ? $studio->trial_ends_at : null,
+				'billing'         => Plans::status( $studio ),
 				'status'          => $studio->status,
 				'settings'        => $settings,
 			);

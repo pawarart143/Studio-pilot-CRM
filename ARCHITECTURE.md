@@ -25,7 +25,7 @@ Browser (React SPA at /crm)  ──REST (cookie + nonce)──►  WordPress
 * `pcrm_members` links a WordPress user to a studio with a CRM role. One user may belong to several studios (studio switcher). Team members without a login (e.g. freelance second shooters) are members with `user_id = NULL`.
 * Each REST request resolves the **current member** (logged-in user + current studio stored in user meta, verified against `pcrm_members`). All queries go through `PCRM\Db` helpers that always add `studio_id = %d`. A record id from another studio returns 404.
 * Studio status `suspended` blocks all API access for that studio (super admin control).
-* Plans: Free, Starter, Professional, Enterprise with limits (team members, leads per month). Limits are enforced server-side on create.
+* Plans: Starter (15-day trial), Professional, Business, stored in `pcrm_plans`. Limits (team logins, new leads a month) and features (WhatsApp templates, Razorpay links) are enforced server-side (`PCRM\Plans::check`). After a trial or plan ends, `Rest\Base::check_plan` makes the studio read-only (HTTP 402 for writes) unless `pcrm_billing_after_expiry` = `starter_limits`. ShootPilot's own subscriptions use Razorpay Subscriptions with platform keys (`PCRM\Billing`, `Rest\Billing`, webhook `/billing/webhook`).
 
 ## 3. Roles & permissions
 
@@ -78,6 +78,7 @@ All tables are prefixed `{wp_prefix}pcrm_`. Money is `DECIMAL(12,2)` in INR. Dat
 | tasks | Tasks with priority, deadline, assignee, status | assigned_to, related entity |
 | documents | Files (WordPress media) attached to clients/bookings | client_id, booking_id |
 | wa_templates | WhatsApp message templates with {{placeholders}} | studio_id |
+| notifications | Task / follow-up reminders: event, due time, email status, alerted / read (v0.6.0, `PCRM\\Reminders`, cron `pcrm_reminders_tick` every 5 min) | member_id, item_id |
 
 Referential integrity is enforced in the service layer (WordPress' dbDelta does not manage foreign keys); deletes cascade in code inside a transaction.
 
@@ -124,3 +125,4 @@ INR (₹, Indian digit grouping 1,00,000), Asia/Kolkata, DD-MM-YYYY, +91, GST 18
 * **WhatsApp:** click-to-chat (`wa.me`) with filled templates works without any account. WhatsApp Cloud API sending is implemented behind settings (phone number ID + access token) and is marked *untested* until real credentials are supplied.
 * **Payments gateway (subscriptions):** plans are assigned by the super admin. Razorpay checkout is a planned phase, not faked.
 * **Email:** uses `wp_mail`; the host must have working mail/SMTP for password reset emails.
+* **Google Calendar (v0.6.0-gcal):** one-way push of bookings (per event date), tasks, follow-ups and payment due dates to each studio's own Google Calendar. `includes/class-gcal.php` (OAuth, encrypted tokens, queue worker with retries, WP-Cron triggers), `includes/class-gcal-events.php` (builds events from CRM tables), `includes/rest/class-gcal.php` (Settings API). Tables `gcal_accounts`, `gcal_links`, `gcal_queue` with their own schema version. Tested against a stand-in Google server, not yet against real Google.

@@ -8,11 +8,12 @@ class Plugin {
 	const REST_NS = 'pcrm/v1';
 
 	public static function controllers() {
-		return array( 'Auth', 'Dashboard', 'Leads', 'Calls', 'Followups', 'Clients', 'Services', 'Quotations', 'Bookings', 'Payments', 'Expenses', 'Calendar', 'Team', 'Tasks', 'Documents', 'Reports', 'Whatsapp', 'Settings', 'Admin', 'Razorpay', 'Deliverables', 'Portal', 'Crew', 'Enquiry_Forms' );
+		return array( 'Auth', 'Dashboard', 'Leads', 'Calls', 'Followups', 'Clients', 'Services', 'Quotations', 'Bookings', 'Payments', 'Expenses', 'Calendar', 'Team', 'Tasks', 'Documents', 'Reports', 'Whatsapp', 'Settings', 'Admin', 'Razorpay', 'Deliverables', 'Portal', 'Crew', 'Enquiry_Forms', 'Quote_Packages', 'Notifications', 'Billing' );
 	}
 
 	public static function init() {
 		Installer::maybe_upgrade();
+		Billing_Installer::maybe_install();
 		add_action( 'init', array( __CLASS__, 'add_rewrite' ) );
 		add_filter( 'query_vars', array( __CLASS__, 'query_vars' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'route' ), 0 );
@@ -23,6 +24,8 @@ class Plugin {
 			}
 		);
 		Landing::init();
+		Gcal::init();
+		Reminders::init();
 		if ( isset( $_GET['pcrm_google'] ) ) { // phpcs:ignore
 			add_action( 'init', array( 'PCRM\\Google_Auth', 'handle' ), 20 );
 		}

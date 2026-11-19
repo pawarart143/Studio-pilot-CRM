@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       ShootPilot (Photographer CRM)
- * Description:       Multi-studio CRM for photographers: leads, pipeline, calling, quotations, bookings, payments, deliverables, client portal, calendar, team, tasks and reports. Open it at /crm.
- * Version:           0.5.0
+ * Description:       Multi-studio CRM for photographers: leads, pipeline, calling, quotations, bookings, payments, deliverables, client portal, calendar with Google Calendar sync, team, tasks, reports and subscription billing. Open it at /crm.
+ * Version:           0.6.0
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            ShootPilot
@@ -12,8 +12,10 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'PCRM_VERSION', '0.5.0' );
+define( 'PCRM_VERSION', '0.6.0' );
 define( 'PCRM_DB_VERSION', '5' );
+// Quotation generator schema, versioned on its own option (pcrm_quote_db_version) so it never clashes with PCRM_DB_VERSION.
+define( 'PCRM_QUOTE_DB_VERSION', '1' );
 define( 'PCRM_FILE', __FILE__ );
 define( 'PCRM_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCRM_URL', plugin_dir_url( __FILE__ ) );
@@ -40,6 +42,12 @@ spl_autoload_register(
 );
 
 register_activation_hook( __FILE__, array( 'PCRM\\Installer', 'activate' ) );
-register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );
+register_deactivation_hook(
+	__FILE__,
+	function () {
+		flush_rewrite_rules();
+		wp_clear_scheduled_hook( 'pcrm_reminders_tick' );
+	}
+);
 
 add_action( 'plugins_loaded', array( 'PCRM\\Plugin', 'init' ) );

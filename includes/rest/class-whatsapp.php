@@ -33,7 +33,16 @@ class Whatsapp extends Base {
 		);
 	}
 
+	/** WhatsApp share with ready templates is a Professional / Business feature. */
+	private function gate() {
+		$r = \PCRM\Plans::check( Tenant::studio(), 'whatsapp_templates' );
+		return is_wp_error( $r ) ? $r : null;
+	}
+
 	public function create_template( $req ) {
+		if ( $g = $this->gate() ) { // phpcs:ignore
+			return $g;
+		}
 		$data = $this->validate( $req, $this->schema() );
 		if ( is_wp_error( $data ) ) {
 			return $data;
@@ -44,6 +53,9 @@ class Whatsapp extends Base {
 	}
 
 	public function update_template( $req ) {
+		if ( $g = $this->gate() ) { // phpcs:ignore
+			return $g;
+		}
 		$id = (int) $req['id'];
 		if ( ! Db::exists( 'wa_templates', $id ) ) {
 			return $this->not_found( 'Template' );
@@ -72,6 +84,9 @@ class Whatsapp extends Base {
 	 * Fills a template for a record and returns the text plus a wa.me link.
 	 */
 	public function render( $req ) {
+		if ( $g = $this->gate() ) { // phpcs:ignore
+			return $g;
+		}
 		$b   = $this->body( $req );
 		$ctx = array();
 		if ( ! empty( $b['lead_id'] ) ) {
@@ -170,6 +185,9 @@ class Whatsapp extends Base {
 	}
 
 	public function send( $req ) {
+		if ( $g = $this->gate() ) { // phpcs:ignore
+			return $g;
+		}
 		$b     = $this->body( $req );
 		$phone = isset( $b['phone'] ) ? \PCRM\Validator::phone( (string) $b['phone'] ) : null;
 		$text  = isset( $b['text'] ) ? sanitize_textarea_field( $b['text'] ) : '';
@@ -191,6 +209,11 @@ class Whatsapp extends Base {
 	}
 
 	public function status() {
-		return $this->ok( array( 'api_configured' => WA::api_configured() ) );
+		return $this->ok(
+			array(
+				'api_configured' => WA::api_configured(),
+				'templates'      => \PCRM\Plans::has_feature( Tenant::studio(), 'whatsapp_templates' ),
+			)
+		);
 	}
 }

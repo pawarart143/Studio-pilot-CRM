@@ -83,7 +83,11 @@ class Db {
 		if ( false === $ok ) {
 			return new \WP_Error( 'db_error', 'Could not save. ' . $wpdb->last_error, array( 'status' => 500 ) );
 		}
-		return (int) $wpdb->insert_id;
+		$id = (int) $wpdb->insert_id;
+		if ( in_array( $table, self::watched(), true ) ) {
+			do_action( 'pcrm_inserted', $table, $id, $data, (int) $data['studio_id'] );
+		}
+		return $id;
 	}
 
 	public static function update( $table, $id, array $data, $studio_id = null ) {
@@ -97,9 +101,14 @@ class Db {
 		if ( ! $data ) {
 			return true;
 		}
-		$ok = $wpdb->update( self::t( $table ), $data, array( 'id' => (int) $id, 'studio_id' => self::sid( $studio_id ) ) );
+		$watch = in_array( $table, self::watched(), true );
+		$old   = $watch ? self::find( $table, $id, $studio_id ) : null;
+		$ok    = $wpdb->update( self::t( $table ), $data, array( 'id' => (int) $id, 'studio_id' => self::sid( $studio_id ) ) );
 		if ( false === $ok ) {
 			return new \WP_Error( 'db_error', 'Could not save. ' . $wpdb->last_error, array( 'status' => 500 ) );
+		}
+		if ( $watch && $old ) {
+			do_action( 'pcrm_updated', $table, (int) $id, $old, $data, self::sid( $studio_id ) );
 		}
 		return true;
 	}
@@ -113,6 +122,11 @@ class Db {
 		global $wpdb;
 		$where['studio_id'] = self::sid( $studio_id );
 		return $wpdb->delete( self::t( $table ), $where );
+	}
+
+	/** Tables whose writes fire pcrm_inserted / pcrm_updated (reminders listen). */
+	public static function watched() {
+		return (array) apply_filters( 'pcrm_watched_tables', array() );
 	}
 
 	public static function columns( $table ) {
@@ -160,7 +174,7 @@ class Db {
 		if ( ! $row ) {
 			return $row;
 		}
-		$ints   = array( 'id', 'studio_id', 'client_id', 'lead_id', 'booking_id', 'quotation_id', 'assigned_to', 'member_id', 'user_id', 'service_id', 'installment_id', 'booking_event_id', 'created_by', 'position', 'sort', 'attachment_id', 'size', 'is_active', 'uploaded_by', 'owner_user_id', 'progress', 'booking_service_id', 'template_id', 'days_after_event', 'view_count', 'failed_attempts', 'updated_by', 'on_site', 'is_enabled', 'pin_version', 'payment_id', 'crew_member_id', 'schedule_id', 'assignment_id', 'crew_expense_id', 'conflict_override', 'is_core', 'is_required', 'form_id', 'duplicate_lead_id', 'handled_by', 'enquiry_submission_id', 'assign_member_id', 'entity_id', 'updated_by' );
+		$ints   = array( 'id', 'studio_id', 'client_id', 'lead_id', 'booking_id', 'quotation_id', 'assigned_to', 'member_id', 'user_id', 'service_id', 'installment_id', 'booking_event_id', 'created_by', 'position', 'sort', 'attachment_id', 'size', 'is_active', 'uploaded_by', 'owner_user_id', 'progress', 'booking_service_id', 'template_id', 'days_after_event', 'view_count', 'failed_attempts', 'updated_by', 'on_site', 'is_enabled', 'pin_version', 'payment_id', 'crew_member_id', 'schedule_id', 'assignment_id', 'crew_expense_id', 'conflict_override', 'is_core', 'is_required', 'form_id', 'duplicate_lead_id', 'handled_by', 'enquiry_submission_id', 'assign_member_id', 'entity_id', 'updated_by', 'package_id' );
 		$floats = array( 'budget', 'price', 'subtotal', 'discount_value', 'discount_amount', 'gst_rate', 'gst_amount', 'total', 'qty', 'rate', 'amount', 'total_amount', 'paid', 'pending', 'paid_amount', 'expenses', 'package_amount', 'daily_rate', 'agreed_rate', 'advance_paid', 'remaining' );
 		foreach ( $row as $k => $v ) {
 			if ( null === $v ) {

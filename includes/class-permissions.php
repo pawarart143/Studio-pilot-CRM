@@ -6,6 +6,11 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Role → permission matrix. The SPA uses it to hide menus; the REST layer
  * re-checks every request.
+ *
+ * Business access (money, reports, the team directory, business settings and
+ * the plan) belongs to the studio owner and admins only. Team roles never get
+ * the keys in business_permissions(), so every page, API route and dashboard
+ * widget that checks those keys is closed to them.
  */
 class Permissions {
 
@@ -31,36 +36,57 @@ class Permissions {
 		);
 
 		// Creative crew update the deliverables assigned to them (status, progress, link).
-		$creative = array( 'dashboard.view', 'calendar.view', 'bookings.view', 'clients.view', 'tasks.view', 'tasks.edit', 'team.view', 'deliverables.view', 'deliverables.update' );
+		$creative = array( 'dashboard.view', 'calendar.view', 'bookings.view', 'clients.view', 'tasks.view', 'tasks.edit', 'deliverables.view', 'deliverables.update' );
+
+		$business = self::business_permissions();
+		$strip    = function ( $perms ) use ( $business ) {
+			return array_values( array_diff( $perms, $business ) );
+		};
 
 		return array(
 			'owner'              => $all,
 			'admin'              => $all,
-			'sales'              => array(
+			// Team roles go through $strip so a later edit can never hand them business access.
+			'sales'              => $strip( array(
 				'dashboard.view', 'leads.view', 'leads.edit', 'leads.import', 'leads.view_all',
 				'quotes.view', 'quotes.edit',
 				'clients.view', 'clients.edit',
 				'bookings.view', 'bookings.view_all', 'bookings.edit',
-				'payments.view',
 				'deliverables.view', 'deliverables.view_all',
 				'calendar.view',
 				'tasks.view', 'tasks.edit',
-				'team.view', 'reports.view', 'whatsapp.send',
-			),
-			'production_manager' => array(
+				'whatsapp.send',
+			) ),
+			'production_manager' => $strip( array(
 				'dashboard.view', 'leads.view', 'leads.view_all', 'quotes.view',
 				'clients.view', 'clients.edit',
 				'bookings.view', 'bookings.view_all', 'bookings.edit', 'bookings.assign',
 				'deliverables.view', 'deliverables.view_all', 'deliverables.edit', 'deliverables.update',
 				'calendar.view',
 				'tasks.view', 'tasks.edit', 'tasks.view_all',
-				'team.view', 'reports.view', 'whatsapp.send',
+				'whatsapp.send',
 				'crew.view', 'crew.edit',
-			),
-			'photographer'       => $creative,
-			'cinematographer'    => $creative,
-			'editor'             => $creative,
-			'album_designer'     => $creative,
+			) ),
+			'photographer'       => $strip( $creative ),
+			'cinematographer'    => $strip( $creative ),
+			'editor'             => $strip( $creative ),
+			'album_designer'     => $strip( $creative ),
+		);
+	}
+
+	/**
+	 * Keys that make up the "Business" area. Only owner and admin hold them.
+	 */
+	public static function business_permissions() {
+		return array(
+			'payments.view', 'payments.edit',
+			'expenses.view', 'expenses.edit',
+			'crew.payments',
+			'reports.view',
+			'team.view', 'team.edit',
+			'settings.edit',
+			'portal.manage',
+			'enquiry.manage',
 		);
 	}
 

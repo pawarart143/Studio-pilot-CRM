@@ -29,6 +29,8 @@ class Deliverables extends Base {
 
 	public function register() {
 		$this->route( '/deliverables', 'GET', array( $this, 'index' ), 'deliverables.view' );
+		$this->route( '/deliverables/clients', 'GET', array( $this, 'by_client' ), 'deliverables.view' );
+		$this->route( '/deliverables/clients/(?P<id>\d+)', 'GET', array( $this, 'client_detail' ), 'deliverables.view' );
 		$this->route( '/bookings/(?P<id>\d+)/deliverables', 'POST', array( $this, 'create' ), 'deliverables.edit' );
 		$this->route( '/bookings/(?P<id>\d+)/deliverables/template', 'POST', array( $this, 'apply_template' ), 'deliverables.edit' );
 		$this->route( '/deliverables/(?P<id>\d+)', 'PUT', array( $this, 'update' ), array( 'deliverables.edit', 'deliverables.update' ) );
@@ -169,9 +171,9 @@ class Deliverables extends Base {
 
 	/* ---------- Routes ---------- */
 
-	public function index( $req ) {
+	/** WHERE parts shared by the item list and the client-grouped list. */
+	private function list_filters( $req ) {
 		global $wpdb;
-		list( $page, $per, $off ) = $this->paginate( $req );
 		$w = array( $wpdb->prepare( 'd.studio_id=%d', $this->sid() ) );
 		if ( ! Tenant::can( 'deliverables.view_all' ) ) {
 			$w[] = $wpdb->prepare( 'd.assigned_to=%d', $this->member_id() );
@@ -199,12 +201,13 @@ class Deliverables extends Base {
 			$like = $this->like( $q );
 			$w[]  = $wpdb->prepare( '(d.name LIKE %s OR b.number LIKE %s OR b.title LIKE %s OR c.name LIKE %s)', $like, $like, $like, $like );
 		}
-		$where = implode( ' AND ', $w );
-		$join  = ' JOIN ' . Db::t( 'bookings' ) . ' b ON b.id=d.booking_id JOIN ' . Db::t( 'clients' ) . ' c ON c.id=b.client_id LEFT JOIN ' . Db::t( 'members' ) . ' m ON m.id=d.assigned_to';
-		$total = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . Db::t( 'booking_deliverables' ) . " d $join WHERE $where" );
-		$rows  = $wpdb->get_results( 'SELECT d.*, b.number AS booking_number, b.title AS booking_title, b.status AS booking_status, c.name AS client_name, m.name AS assigned_name, m.color AS assigned_color FROM ' . Db::t( 'booking_deliverables' ) . " d $join WHERE $where ORDER BY d.status='delivered', d.expected_date IS NULL, d.expected_date ASC, d.id DESC LIMIT $per OFFSET $off" );
-		// Counts by status for the filter chips (same visibility, ignoring the status filter).
-		$cw   = array( $wpdb->prepare( 'studio_id=%d', $this->sid() ) );
+		return $w;
+	}
+
+	/** Status counts and overdue count for the filter chips (visibility only, no status filter). */
+	private function chip_counts() {
+		global $wpdb;
+		$cw = array( $wpdb->prepare( 'studio_id=%d', $this->sid() ) );
 		if ( ! Tenant::can( 'deliverables.view_all' ) ) {
 			$cw[] = $wpdb->prepare( 'assigned_to=%d', $this->member_id() );
 		}
@@ -213,7 +216,221 @@ class Deliverables extends Base {
 			$counts[ $c->status ] = (int) $c->n;
 		}
 		$overdue = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . Db::t( 'booking_deliverables' ) . ' WHERE ' . implode( ' AND ', $cw ) . " AND status<>'delivered' AND expected_date IS NOT NULL AND expected_date < %s", Db::today() ) );
+		return array( $counts, $overdue );
+	}
+
+	public function index( $req ) {
+		global $wpdb;
+		list( $page, $per, $off ) = $this->paginate( $req );
+		$w     = $this->list_filters( $req );
+		$where = implode( ' AND ', $w );
+		$join  = ' JOIN ' . Db::t( 'bookings' ) . ' b ON b.id=d.booking_id JOIN ' . Db::t( 'clients' ) . ' c ON c.id=b.client_id LEFT JOIN ' . Db::t( 'members' ) . ' m ON m.id=d.assigned_to';
+		$total = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . Db::t( 'booking_deliverables' ) . " d $join WHERE $where" );
+		$rows  = $wpdb->get_results( 'SELECT d.*, b.number AS booking_number, b.title AS booking_title, b.status AS booking_status, c.name AS client_name, m.name AS assigned_name, m.color AS assigned_color FROM ' . Db::t( 'booking_deliverables' ) . " d $join WHERE $where ORDER BY d.status='delivered', d.expected_date IS NULL, d.expected_date ASC, d.id DESC LIMIT $per OFFSET $off" );
+		list( $counts, $overdue ) = $this->chip_counts();
 		return $this->ok( array( 'items' => Db::cast_all( $rows ), 'total' => $total, 'page' => $page, 'per_page' => $per, 'counts' => $counts, 'overdue' => $overdue ) );
+	}
+
+	/** Pipeline order used to name a client's current stage. */
+	private static function stage_of( array $status_counts, $total ) {
+		if ( ! $total ) {
+			return null;
+		}
+		if ( ! empty( $status_counts['revision_requested'] ) ) {
+			return 'revision_requested';
+		}
+		foreach ( array( 'not_started', 'in_progress', 'editing', 'awaiting_selection', 'under_review', 'ready' ) as $s ) {
+			if ( ! empty( $status_counts[ $s ] ) ) {
+				return $s;
+			}
+		}
+		return 'delivered';
+	}
+
+	/** Summary of a set of deliverable rows (all of one client or one booking). */
+	private static function summarise( array $rows ) {
+		$today = Db::today();
+		$sc    = array();
+		$out   = array( 'total' => 0, 'delivered' => 0, 'overdue' => 0, 'unassigned' => 0, 'next_due' => null );
+		foreach ( $rows as $r ) {
+			$out['total']++;
+			$sc[ $r->status ] = ( isset( $sc[ $r->status ] ) ? $sc[ $r->status ] : 0 ) + 1;
+			if ( 'delivered' === $r->status ) {
+				$out['delivered']++;
+				continue;
+			}
+			if ( empty( $r->assigned_to ) ) {
+				$out['unassigned']++;
+			}
+			if ( $r->expected_date ) {
+				if ( $r->expected_date < $today ) {
+					$out['overdue']++;
+				}
+				if ( null === $out['next_due'] || $r->expected_date < $out['next_due'] ) {
+					$out['next_due'] = $r->expected_date;
+				}
+			}
+		}
+		$out['progress']      = self::overall( $rows );
+		$out['status_counts'] = $sc;
+		$out['stage']         = self::stage_of( $sc, $out['total'] );
+		return $out;
+	}
+
+	/**
+	 * Deliverables grouped by client (one row per client, with a line per
+	 * booking). The filters pick which clients appear; the summary always
+	 * covers every deliverable of that client the user is allowed to see.
+	 */
+	public function by_client( $req ) {
+		global $wpdb;
+		list( $page, $per, $off ) = $this->paginate( $req );
+		$where = implode( ' AND ', $this->list_filters( $req ) );
+		$join  = ' JOIN ' . Db::t( 'bookings' ) . ' b ON b.id=d.booking_id JOIN ' . Db::t( 'clients' ) . ' c ON c.id=b.client_id';
+		$from  = ' FROM ' . Db::t( 'booking_deliverables' ) . " d $join WHERE $where";
+		$total = (int) $wpdb->get_var( 'SELECT COUNT(DISTINCT c.id)' . $from );
+		$groups = $wpdb->get_results(
+			'SELECT c.id AS client_id, COUNT(*) AS matching'
+			. $from
+			. " GROUP BY c.id ORDER BY SUM(CASE WHEN d.status<>'delivered' THEN 1 ELSE 0 END)=0, MIN(CASE WHEN d.status<>'delivered' THEN d.expected_date END) IS NULL, MIN(CASE WHEN d.status<>'delivered' THEN d.expected_date END) ASC, MAX(d.id) DESC LIMIT $per OFFSET $off"
+		);
+		$items = array();
+		if ( $groups ) {
+			$ids      = array_map( 'intval', wp_list_pluck( $groups, 'client_id' ) );
+			$in       = implode( ',', $ids );
+			$vis      = Tenant::can( 'deliverables.view_all' ) ? '' : $wpdb->prepare( ' AND d.assigned_to=%d', $this->member_id() );
+			$rows     = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT d.id, d.booking_id, d.status, d.progress, d.expected_date, d.assigned_to, b.number AS booking_number, b.title AS booking_title, b.status AS booking_status, b.client_id, c.name AS client_name, c.phone AS client_phone, c.city AS client_city,'
+					. ' (SELECT MIN(e.event_date) FROM ' . Db::t( 'booking_events' ) . ' e WHERE e.booking_id=b.id AND e.studio_id=b.studio_id) AS first_event'
+					. ' FROM ' . Db::t( 'booking_deliverables' ) . " d $join WHERE d.studio_id=%d AND c.id IN ($in)$vis ORDER BY b.id, d.sort, d.id",
+					$this->sid()
+				)
+			);
+			$by       = array();
+			foreach ( $rows as $r ) {
+				$by[ (int) $r->client_id ][ (int) $r->booking_id ][] = $r;
+			}
+			foreach ( $groups as $g ) {
+				$cid      = (int) $g->client_id;
+				$bookings = isset( $by[ $cid ] ) ? $by[ $cid ] : array();
+				$all      = array();
+				$blist    = array();
+				$first    = null;
+				foreach ( $bookings as $bid => $drows ) {
+					$all     = array_merge( $all, $drows );
+					$first   = $drows[0];
+					$blist[] = array_merge(
+						array(
+							'id'          => (int) $bid,
+							'number'      => $drows[0]->booking_number,
+							'title'       => $drows[0]->booking_title,
+							'status'      => $drows[0]->booking_status,
+							'first_event' => $drows[0]->first_event,
+						),
+						self::summarise( $drows )
+					);
+				}
+				if ( ! $first ) {
+					continue;
+				}
+				$items[] = array_merge(
+					array(
+						'client_id'     => $cid,
+						'client_name'   => $first->client_name,
+						'client_phone'  => $first->client_phone,
+						'client_city'   => $first->client_city,
+						'matching'      => (int) $g->matching,
+						'booking_count' => count( $blist ),
+						'bookings'      => $blist,
+					),
+					self::summarise( $all )
+				);
+			}
+		}
+		list( $counts, $overdue ) = $this->chip_counts();
+		return $this->ok( array( 'items' => $items, 'total' => $total, 'page' => $page, 'per_page' => $per, 'counts' => $counts, 'overdue' => $overdue ) );
+	}
+
+	/**
+	 * Every deliverable of one client, grouped by booking, for the client
+	 * workspace. Users without deliverables.view_all only get the ones
+	 * assigned to them; editors also get the client's bookings that have no
+	 * deliverables yet, so they can add some.
+	 */
+	public function client_detail( $req ) {
+		global $wpdb;
+		$cid    = (int) $req['id'];
+		$client = Db::find( 'clients', $cid );
+		if ( ! $client ) {
+			return $this->not_found( 'Client' );
+		}
+		$all_vis = Tenant::can( 'deliverables.view_all' );
+		$vis     = $all_vis ? '' : $wpdb->prepare( ' AND d.assigned_to=%d', $this->member_id() );
+		$rows    = Db::cast_all(
+			$wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT d.*, m.name AS assigned_name, m.color AS assigned_color, u.display_name AS updated_by_name FROM ' . Db::t( 'booking_deliverables' ) . ' d JOIN ' . Db::t( 'bookings' ) . ' b ON b.id=d.booking_id LEFT JOIN ' . Db::t( 'members' ) . ' m ON m.id=d.assigned_to LEFT JOIN ' . $wpdb->users . " u ON u.ID=d.updated_by WHERE d.studio_id=%d AND b.client_id=%d$vis ORDER BY d.booking_id, d.sort, d.id",
+					$this->sid(),
+					$cid
+				)
+			)
+		);
+		$by = array();
+		foreach ( $rows as $r ) {
+			$by[ (int) $r->booking_id ][] = $r;
+		}
+		if ( ! $rows && ! Tenant::can( 'deliverables.edit' ) && ! $all_vis ) {
+			return $this->not_found( 'Client' );
+		}
+		$bw = $wpdb->prepare( 'b.studio_id=%d AND b.client_id=%d', $this->sid(), $cid );
+		if ( ! Tenant::can( 'deliverables.edit' ) ) {
+			$bw .= $by ? ' AND b.id IN (' . implode( ',', array_map( 'intval', array_keys( $by ) ) ) . ')' : ' AND 0=1';
+		}
+		$brows    = $wpdb->get_results(
+			'SELECT b.id, b.number, b.title, b.status, (SELECT MIN(e.event_date) FROM ' . Db::t( 'booking_events' ) . ' e WHERE e.booking_id=b.id AND e.studio_id=b.studio_id) AS first_event, (SELECT MAX(e.event_date) FROM ' . Db::t( 'booking_events' ) . ' e WHERE e.booking_id=b.id AND e.studio_id=b.studio_id) AS last_event FROM ' . Db::t( 'bookings' ) . " b WHERE $bw ORDER BY first_event IS NULL, first_event DESC, b.id DESC"
+		);
+		$bookings = array();
+		foreach ( $brows as $b ) {
+			$list = isset( $by[ (int) $b->id ] ) ? $by[ (int) $b->id ] : array();
+			if ( ! $list && 'cancelled' === $b->status ) {
+				continue;
+			}
+			$bookings[] = array_merge(
+				array(
+					'id'           => (int) $b->id,
+					'number'       => $b->number,
+					'title'        => $b->title,
+					'status'       => $b->status,
+					'first_event'  => $b->first_event,
+					'last_event'   => $b->last_event,
+					'deliverables' => $list,
+				),
+				self::summarise( $list )
+			);
+		}
+		// Bookings with work come first, then empty ones.
+		usort(
+			$bookings,
+			function ( $a, $b ) {
+				return ( $a['total'] ? 0 : 1 ) - ( $b['total'] ? 0 : 1 );
+			}
+		);
+		return $this->ok(
+			array_merge(
+				array(
+					'client'   => array(
+						'id'       => (int) $client->id,
+						'name'     => $client->name,
+						'phone'    => $client->phone,
+						'whatsapp' => $client->whatsapp,
+						'city'     => $client->city,
+					),
+					'bookings' => $bookings,
+				),
+				self::summarise( $rows )
+			)
+		);
 	}
 
 	public function create( $req ) {

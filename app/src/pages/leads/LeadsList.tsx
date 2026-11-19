@@ -7,7 +7,7 @@ import { api, type Paged } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { teamOptions, useTeam, type Lead } from '@/lib/data';
 import { useDebounce, useUrlState } from '@/lib/hooks';
-import { fmtDate, fmtDateTime, inr, telLink, waLink, dayjs, phoneDisplay } from '@/lib/format';
+import { fmtDate, fmtDateTime, inr, telLink, waLink, dayjs, phoneDisplay, eventDays, eventDayCount } from '@/lib/format';
 import { callTone, priorityTone, stageTone } from '@/lib/tones';
 import { Badge, Button, Card, Checkbox, EmptyState, ErrorState, Input, PageHeader, Pagination, SearchInput, Select, TableSkeleton, useUi, Menu, MenuItem } from '@/components/ui';
 import { LeadFormModal } from './LeadForm';
@@ -188,9 +188,9 @@ export default function LeadsList() {
                           </div>
                           <p className="truncate text-xs text-muted">{phoneDisplay(l.phone)}{l.city ? ' · ' + l.city : ''}</p>
                         </td>
-                        <td className="td whitespace-nowrap">
-                          <p>{l.event_type ? config.event_types[l.event_type] : '—'}</p>
-                          <p className="text-xs text-muted">{fmtDate(l.event_date)}{l.event_end_date && l.event_end_date !== l.event_date ? ' → ' + fmtDate(l.event_end_date) : ''}</p>
+                        <td className="td align-top">
+                          <p className="whitespace-nowrap">{l.event_type ? config.event_types[l.event_type] : '—'}</p>
+                          <EventDates start={l.event_date} end={l.event_end_date} />
                         </td>
                         <td className="td whitespace-nowrap text-muted">
                           {l.source ? config.sources[l.source] : '—'}
@@ -224,7 +224,8 @@ export default function LeadsList() {
                 <li key={l.id} className="flex items-start gap-3 px-4 py-3">
                   <Link to={`/leads/${l.id}`} className="min-w-0 flex-1">
                     <p className="truncate font-medium">{l.name}</p>
-                    <p className="truncate text-xs text-muted">{l.event_type ? config.event_types[l.event_type] : 'Event'} · {fmtDate(l.event_date)} · {l.city || '—'}</p>
+                    <p className="truncate text-xs text-muted">{l.event_type ? config.event_types[l.event_type] : 'Event'}{eventDayCount(l.event_date, l.event_end_date) > 1 ? ` · ${eventDayCount(l.event_date, l.event_end_date)} days` : ''} · {l.city || '—'}</p>
+                    <p className="text-xs text-muted">{eventDays(l.event_date, l.event_end_date, 4).map(fmtDate).join(', ') || '—'}{eventDayCount(l.event_date, l.event_end_date) > 4 ? ` +${eventDayCount(l.event_date, l.event_end_date) - 4} more` : ''}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       <Badge tone={stageTone[l.stage]} dot>{config.stages[l.stage]}</Badge>
                       {l.budget ? <Badge>{inr(l.budget)}</Badge> : null}
@@ -241,6 +242,24 @@ export default function LeadsList() {
       </Card>
       <LeadFormModal open={formOpen} onClose={() => setFormOpen(false)} />
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+    </div>
+  );
+}
+
+/** Every day of the event, one date per day (start through end). Single-day events show one date. */
+function EventDates({ start, end }: { start?: string | null; end?: string | null }) {
+  const total = eventDayCount(start, end);
+  if (!total) return <p className="text-xs text-muted">—</p>;
+  const shown = eventDays(start, end, 6);
+  return (
+    <div className="mt-0.5 space-y-0.5">
+      {shown.map((d, i) => (
+        <p key={d} className="whitespace-nowrap text-xs text-muted">
+          {total > 1 && <span className="text-faint">Day {i + 1} · </span>}
+          {fmtDate(d)}
+        </p>
+      ))}
+      {total > shown.length && <p className="whitespace-nowrap text-xs text-faint">+{total - shown.length} more day{total - shown.length > 1 ? 's' : ''}</p>}
     </div>
   );
 }

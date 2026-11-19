@@ -98,8 +98,11 @@ export default function BookingForm() {
       } else setNewClient({ name: p.client.name || '', phone: p.client.phone || '', email: p.client.email || '', city: p.client.city || '' });
       setH((x) => ({ ...x, title: p.title, event_type: p.event_type || '', package_details: p.package_details || '', confirmed_on: p.confirmed_on || today() }));
       total = p.total_amount ? String(p.total_amount) : '';
-      if (p.events?.length) setEvents(p.events.map((e: any) => newEvent({ name: e.name, event_type: e.event_type || '', event_date: e.event_date, venue: e.venue || '', city: e.city || '' })));
+      if (p.events?.length) setEvents(p.events.map((e: any) => newEvent({ name: e.name, event_type: e.event_type || '', event_date: e.event_date, start_time: hm(e.start_time), end_time: hm(e.end_time), venue: e.venue || '', city: e.city || '', notes: e.notes || '' })));
     }
+    // v0.6.0: the quotation's event days and payment plan carry over to the booking.
+    const qEvents = (q?.events || []).filter((e: any) => e.event_date);
+    const qPlan: any[] = q?.payment_schedule?.length ? q.payment_schedule : p?.payment_schedule || [];
     if (q) {
       setQuotationId(q.id);
       total = String(q.total);
@@ -110,8 +113,11 @@ export default function BookingForm() {
           setClientId(q.client_id);
           setClientLabel(`${q.customer_name} · ${phoneDisplay(q.customer_phone)}`);
         } else setNewClient({ name: q.customer_name || '', phone: q.customer_phone || '', email: q.customer_email || '', city: '' });
-        if (q.event_date) setEvents([newEvent({ name: q.event_type ? config.event_types[q.event_type] : 'Event', event_type: q.event_type || '', event_date: q.event_date, venue: q.venue || '' })]);
+        if (!qEvents.length && q.event_date) setEvents([newEvent({ name: q.event_type ? config.event_types[q.event_type] : 'Event', event_type: q.event_type || '', event_date: q.event_date, venue: q.venue || '' })]);
       }
+      // Quoted services become the booking's services (post-production ones don't block shoot dates).
+      if (q.items?.length) setServices(q.items.map((i: any) => ({ service_id: i.service_id || null, name: i.name, category: i.category || '', on_site: !['album', 'reels'].includes(i.category || ''), notes: Number(i.qty) !== 1 ? `Qty ${Number(i.qty)}${i.unit ? ' ' + i.unit : ''}` : '', team: [] })));
+      if (qEvents.length) setEvents(qEvents.map((e: any) => newEvent({ name: e.name, event_type: e.event_type || '', event_date: e.event_date, start_time: hm(e.start_time), end_time: hm(e.end_time), venue: e.venue || '', city: e.city || '', notes: e.notes || '' })));
     }
     if (clientQ.data && !p && !q) {
       setClientId(clientQ.data.id);
@@ -120,7 +126,10 @@ export default function BookingForm() {
     }
     if (total) {
       setH((x) => ({ ...x, total_amount: total }));
-      setInst(split(num(total), [30, 40, 30]));
+      if (qPlan.length) {
+        const first = (qEvents[0]?.event_date || q?.event_date || p?.events?.[0]?.event_date || '') as string;
+        setInst(qPlan.map((m: any, i: number) => ({ key: k(), label: m.label, amount: String(m.amount), due_date: i === 0 ? today() : i === qPlan.length - 1 ? '' : first ? dayjs(first).subtract(7, 'day').format('YYYY-MM-DD') : '' })));
+      } else setInst(split(num(total), [30, 40, 30]));
     }
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps

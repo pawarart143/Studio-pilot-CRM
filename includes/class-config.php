@@ -101,6 +101,53 @@ class Config {
 		);
 	}
 
+	/** Crew roles a quotation can promise per event day (v0.6.0). */
+	public static function quote_coverage_roles() {
+		return array(
+			'traditional_photographer' => 'Traditional Photographer',
+			'candid_photographer'      => 'Candid Photographer',
+			'traditional_videographer' => 'Traditional Videographer',
+			'cinematographer'          => 'Cinematographer',
+			'drone'                    => 'Drone Operator',
+			'assistant'                => 'Assistant',
+		);
+	}
+
+	/** Item groups on a quotation (v0.6.0). */
+	public static function quote_item_kinds() {
+		return array(
+			'package' => 'Package',
+			'service' => 'Service',
+			'addon'   => 'Add-on',
+		);
+	}
+
+	/** Ready-made deliverable lines the builder offers as chips (v0.6.0). */
+	public static function quote_deliverable_presets() {
+		return array(
+			'Edited high-resolution photographs in an online gallery',
+			'All raw photographs and video footage on a drive',
+			'Cinematic highlight film (4 to 6 minutes)',
+			'Teaser film (about 1 minute)',
+			'Full-length traditional video of all rituals',
+			'Instagram reels, ready to post',
+			'Premium lay-flat photo album',
+			'Photo-book for parents',
+			'Same-day edit shown at the reception',
+			'Drone aerial shots inside the films',
+			'Pre-wedding film with music',
+			'Online face-search photo sharing for guests',
+		);
+	}
+
+	public static function default_payment_schedule() {
+		return array(
+			array( 'label' => 'Advance to confirm the booking', 'percent' => 50, 'due' => 'On booking' ),
+			array( 'label' => 'Before the event', 'percent' => 30, 'due' => '7 days before the first event' ),
+			array( 'label' => 'On delivery', 'percent' => 20, 'due' => 'Before final delivery' ),
+		);
+	}
+
 	public static function booking_statuses() {
 		return array(
 			'confirmed'    => 'Booking Confirmed',
@@ -407,11 +454,21 @@ class Config {
 			'quote_terms'     => "50% advance to confirm the booking.\n30% before the event, balance on delivery.\nEdited photos delivered within 30 days, album within 60 days of selection.\nTravel and stay outside the city are charged extra.",
 			'bank_details'    => '',
 			'upi_id'          => '',
+			'quote_intro'     => "Thank you for considering us to capture your celebration. Below is the coverage we have planned for your events, what you will receive, and the investment.",
+			'quote_closing'   => "We would be honoured to be part of your day. Accept this quotation online, or reply to us with any changes you would like.",
+			'quote_deliverables' => '',
+			'quote_exclusions'   => "Travel, stay and food for the team outside the city\nStorage drives for raw data (if not included above)\nVenue or permission charges for drone flying",
+			'quote_payment_schedule' => self::default_payment_schedule(),
+			'quote_accent'    => '#F3724C',
+			'quote_show_prices' => true,
+			'gst_type'        => 'intra',
 			'wa_phone_id'     => '',
 			'wa_token'        => '',
 			'rzp_key_id'      => '',
 			'rzp_key_secret'  => '',
 			'rzp_webhook_secret' => '',
+			'reminder_lead_minutes' => 30,
+			'reminder_emails'       => true,
 		);
 	}
 
@@ -424,6 +481,9 @@ class Config {
 			'priorities'         => self::priorities(),
 			'quotation_statuses' => self::quotation_statuses(),
 			'service_categories' => self::service_categories(),
+			'quote_coverage_roles' => self::quote_coverage_roles(),
+			'quote_item_kinds'   => self::quote_item_kinds(),
+			'quote_deliverable_presets' => self::quote_deliverable_presets(),
 			'booking_statuses'   => self::booking_statuses(),
 			'payment_methods'    => self::payment_methods(),
 			'expense_categories' => self::expense_categories(),
