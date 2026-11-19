@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { useDebounce, useTheme } from '@/lib/hooks';
 import { Avatar, Badge, Logo, Menu, MenuItem, useUi } from './ui';
 import { LeadFormModal } from '@/pages/leads/LeadForm';
-import { Reminders } from './Reminders';
+import { AlertWatcher, NotificationBell } from './Notifications';
 
 type NavItem = { to: string; label: string; icon: ReactNode; perm?: string; badge?: number };
 
@@ -155,6 +155,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 <span className="hidden sm:inline">New Lead</span>
               </button>
             )}
+            <NotificationBell />
             <button onClick={toggle} className="rounded-lg p-2 text-muted hover:bg-subtle hover:text-ink" aria-label="Toggle dark mode" title={dark ? 'Light mode' : 'Dark mode'}>
               {dark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
             </button>
@@ -176,7 +177,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </button>
       </nav>
       <LeadFormModal open={leadOpen} onClose={() => setLeadOpen(false)} />
-      <Reminders />
+      <AlertWatcher />
       <span className="hidden">{member.id}</span>
     </div>
   );

@@ -412,6 +412,8 @@ class Config {
 			'rzp_key_id'      => '',
 			'rzp_key_secret'  => '',
 			'rzp_webhook_secret' => '',
+			'reminder_lead_minutes' => 30,
+			'reminder_emails'       => true,
 		);
 	}
 
