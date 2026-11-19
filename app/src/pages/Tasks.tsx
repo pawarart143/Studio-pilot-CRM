@@ -12,7 +12,7 @@ import { priorityTone, taskStatusTone } from '@/lib/tones';
 import { Avatar, Badge, Button, Card, EmptyState, ErrorState, PageHeader, SearchInput, Segmented, Select, TableSkeleton, Tabs, Toggle, useUi } from '@/components/ui';
 import { TaskModal } from '@/components/forms';
 
-const defaults = { view: 'open', layout: 'list', mine: '', assigned_to: '', category: '', priority: '', q: '' };
+const defaults = { view: 'open', layout: 'list', mine: '', assigned_to: '', category: '', priority: '', q: '', task: '' };
 
 export default function Tasks() {
   const { config, can } = useAuth();
@@ -27,6 +27,16 @@ export default function Tasks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dq]);
   const [edit, setEdit] = useState<any>(null);
+  // Links from reminder emails and alerts open the task directly: /tasks?task=ID
+  useEffect(() => {
+    if (!f.task) return;
+    api.get(`tasks/${f.task}`).then(
+      (t) => setEdit(t),
+      (e) => toast(e.message, 'error'),
+    );
+    setF({ task: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.task]);
   const board = f.layout === 'board';
   const viewParams: Record<string, any> = board ? {} : f.view === 'done' ? { status: 'done' } : f.view === 'open' ? { status: 'open' } : { due: f.view };
   const params = { ...viewParams, mine: f.mine, assigned_to: f.assigned_to, category: f.category, priority: f.priority, q: f.q };

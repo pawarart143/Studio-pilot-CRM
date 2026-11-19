@@ -394,8 +394,9 @@ class Reminders {
 		if ( ! self::is_open( $kind, $item ) || ! $item->assigned_to ) {
 			return 0;
 		}
-		// Long past items (e.g. imported history) don't need a "scheduled" email.
-		if ( $item->due_at && $item->due_at < self::local( $sid, time() - DAY_IN_SECONDS ) ) {
+		// Already due: the "due now" alert (from generate) covers it, so no
+		// separate "scheduled" email. This also skips imported history.
+		if ( $item->due_at && $item->due_at <= self::local( $sid ) ) {
 			return 0;
 		}
 		$m = self::member( $sid, (int) $item->assigned_to );

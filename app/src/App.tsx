@@ -45,7 +45,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot" element={<Forgot />} />
         <Route path="/reset" element={<Reset />} />
-        <Route path="*" element={<Navigate to={`/login${loc.pathname !== '/' ? '?next=' + encodeURIComponent(window.PCRM.base + loc.pathname) : ''}`} replace />} />
+        <Route path="*" element={<Navigate to={`/login${loc.pathname !== '/' ? '?next=' + encodeURIComponent(window.PCRM.base + loc.pathname + loc.search) : ''}`} replace />} />
       </Routes>
     );
   }
