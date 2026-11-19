@@ -88,7 +88,7 @@ class Dashboard_Widgets {
 			array( 'id' => 'chart_leads_by_stage', 'title' => 'Leads by stage', 'description' => 'Where leads received in the period are in your pipeline.', 'kind' => 'card', 'span' => 1, 'perms' => array( 'leads.view' ), 'ranges' => $period, 'default_range' => 'all' ),
 			array( 'id' => 'chart_cashflow', 'title' => 'Income vs expenses', 'description' => 'Payments received vs. expenses (incl. crew), by month.', 'kind' => 'card', 'span' => 2, 'perms' => array( 'payments.view', 'expenses.view' ), 'ranges' => $months, 'default_range' => '12m' ),
 			array( 'id' => 'list_outstanding', 'title' => 'Outstanding payments', 'description' => 'Bookings with the largest amounts still due.', 'kind' => 'card', 'span' => 1, 'perms' => array( 'payments.view' ) ),
-			array( 'id' => 'list_deliverables', 'title' => 'Deliverables in progress', 'description' => 'Open deliverables, soonest expected date first.', 'kind' => 'card', 'span' => 1, 'perms' => array( 'deliverables.view' ) ),
+			array( 'id' => 'list_deliverables', 'title' => 'Upcoming deliverables', 'description' => 'Open deliverables, soonest expected date first.', 'kind' => 'card', 'span' => 1, 'perms' => array( 'deliverables.view' ) ),
 			array( 'id' => 'list_crew_schedule', 'title' => 'Crew schedule', 'description' => 'Freelance crew booked for upcoming shoots.', 'kind' => 'card', 'span' => 1, 'perms' => array( 'crew.view' ), 'ranges' => array( '7d', '14d', '30d' ), 'default_range' => '7d' ),
 			array( 'id' => 'chart_task_load', 'title' => 'Task load by person', 'description' => 'Open and overdue tasks for each team member.', 'kind' => 'card', 'span' => 1, 'perms' => array( 'tasks.view_all' ) ),
 		);

@@ -188,7 +188,7 @@ function DeliverablesList({ m, it }: { m: WidgetMeta; it: LayoutItem }) {
   const today = dayjs().format('YYYY-MM-DD');
   return (
     <Card>
-      <CardHeader title="Deliverables in progress" subtitle="Soonest expected date first" actions={<Link to="/deliverables" className="text-xs font-medium text-accent-ink">All deliverables</Link>} />
+      <CardHeader title="Upcoming deliverables" subtitle="Open deliverables, soonest expected date first" actions={<Link to="/deliverables" className="text-xs font-medium text-accent-ink">All deliverables</Link>} />
       <CardBody w={w} className="p-5" skeleton="h-40">
         {() =>
           !w.data.items.length ? (
