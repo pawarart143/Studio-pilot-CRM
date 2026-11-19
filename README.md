@@ -14,6 +14,44 @@ Modules include:
 
 Defaults are INR (₹), India, DD-MM-YYYY, Asia/Kolkata and +91.
 
+## What's new in v0.6.0-gcal (Google Calendar sync)
+
+Update with "Replace current with uploaded". Nothing is removed. The update adds three new tables (see below).
+
+ShootPilot can now put your work into Google Calendar by itself. Each studio connects **its own** Google account in **Settings → Google Calendar**.
+
+- **What goes in (each can be turned on or off, all on by default):**
+  - **Bookings:** one event per event date and venue, so a 3-day wedding with Haldi, Sangeet and Reception gets one event for each. Title is "Event – Client name", the venue is the location, and the description has the booking number, client phone, assigned team and crew, services, notes and a link back to ShootPilot. An event with a start and end time is timed (an end time of 12:00 AM counts as midnight that night), a start time without an end time gets 3 hours, and an event with no time is an all-day event. Reminders: 1 day before plus your chosen time.
+  - **Tasks** with a deadline, at their due time (30 minutes). Done tasks stay with a ✓ and no reminder.
+  - **Calls and follow-ups:** every scheduled follow-up, including the "next call" date you set when logging a call (15 minutes, with the lead's phone number).
+  - **Payment reminders:** every installment due date that still has a balance, as an all-day event with the amount due, reminding you at 9 AM the day before. It is removed once the installment is paid, and updated when it is part paid.
+- **Choose the calendar:** your main calendar or any Google calendar you can add events to. A separate "Shoots" calendar is a good idea. Switching moves ShootPilot's events to the new calendar.
+- **Edits and deletes follow automatically.** Every record has a fixed Google event id, so editing updates the same event and a retry can never make a duplicate. Deleting a task, follow-up or booking event date, cancelling a booking or turning a type off removes its events from Google.
+- **Your other Google events are never touched.** ShootPilot only changes events it created (it keeps a list of them and tags them).
+- **One way only:** changes made in Google are not copied back into ShootPilot. If you delete a ShootPilot event in Google, it comes back the next time that record changes.
+- **Never blocks the CRM.** Saving in ShootPilot never waits for Google. Changes are queued and sent in the background, usually within a minute. If Google is down or rate-limits, ShootPilot retries with back-off (1 minute up to 12 hours, 8 tries) and shows any problems with a **Retry all** button. If the Google sign-in expires or is revoked, Settings shows **Reconnect Google**; nothing is lost, and the waiting changes are sent after you reconnect.
+- **Sync window:** items from 30 days ago up to 2 years ahead. Older items already in Google are left as they are.
+- **Disconnect** stops syncing and revokes ShootPilot's access. Tick "Also delete the events ShootPilot added" to clean them out of Google.
+- **Who can use it:** studio owners and admins. Other roles don't see the tab, and the server refuses their requests.
+- **Security:** the Google refresh and access tokens are stored encrypted (libsodium, key from your wp-config.php security keys), never sent to the browser, and each studio's tokens are separate.
+
+### Set-up (once, by the platform super admin)
+
+Google Calendar uses the same Google OAuth client as "Google sign-in" (see below).
+
+1. In [Google Cloud](https://console.cloud.google.com/), in the same project as your sign-in client, go to **APIs & Services → Library** and enable the **Google Calendar API**.
+2. In **Credentials**, open your OAuth client and add a second **Authorised redirect URI**: `https://your-site.com/?pcrm_gcal=callback` (Super Admin → Google sign-in shows the exact address to copy).
+3. In the **OAuth consent screen**, add the scopes `.../auth/calendar.events` and `.../auth/calendar.calendarlist.readonly`. These are "sensitive" scopes: while the app is in **Testing**, only the Google accounts you list as test users can connect, and their sign-in expires after 7 days. To let any studio connect, publish the app and submit it for Google's verification.
+4. If you haven't already, paste the Client ID and secret in Super Admin → Google sign-in. Alternatively put `define( 'PCRM_GCAL_CLIENT_ID', '...' );` and `define( 'PCRM_GCAL_CLIENT_SECRET', '...' );` in wp-config.php to use a separate client for the calendar.
+
+Then each studio goes to Settings → Google Calendar → **Connect Google Calendar**.
+
+ShootPilot sends changes through WP-Cron. If your host has `DISABLE_WP_CRON` set, add a real cron job that opens `https://your-site.com/wp-cron.php` every 5 minutes.
+
+### Database changes (v0.6.0-gcal)
+
+New tables `pcrm_gcal_accounts` (one per studio: Google email, encrypted tokens, calendar, settings, status), `pcrm_gcal_links` (record → Google event id, calendar and a hash of what was sent) and `pcrm_gcal_queue` (pending and failed changes with retry times). No existing table is changed. These tables have their own version option (`pcrm_gcal_db_version`), separate from the main DB version.
+
 ## What's new in v0.5.0 (Crew Scheduling and Public Enquiry Form)
 
 Update with "Replace current with uploaded". Nothing is removed. The update adds new tables and a few new columns on leads (see "Database changes (v0.5.0)").
@@ -200,6 +238,7 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 | WhatsApp Cloud API sending | Built, **not tested against Meta** (no credentials yet) |
 | Razorpay payment links and webhook | Built and tested against simulated Razorpay responses, including webhook signature checks and duplicate webhooks. **Not yet tested with real Razorpay keys.** Try it with Test Mode keys first. |
 | Google sign-in | Built and tested against simulated Google responses. **Not yet tested with a real Google client ID.** |
+| Google Calendar sync (v0.6.0-gcal) | Built and tested end to end against a stand-in Google server that checks requests the way Google does (connect, create, edit, delete for all four types, multi-day bookings, outages, rate limits, expired tokens, calendar switch, disconnect, two studios kept apart). **Not yet tested against real Google** (needs a Google OAuth client with the Calendar API enabled). |
 | Plan billing for studios | Not included. The super admin sets plans by hand. |
 | Email (reset, invites) | Uses WordPress `wp_mail`, so it needs working email on the server |
 

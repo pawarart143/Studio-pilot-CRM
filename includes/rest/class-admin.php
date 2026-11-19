@@ -120,6 +120,7 @@ class Admin extends Base {
 				'google_redirect'   => \PCRM\Google_Auth::redirect_uri(),
 				'google_origin'     => untrailingslashit( home_url() ),
 				'google_enabled'    => (bool) \PCRM\Google_Auth::enabled(),
+				'gcal_redirect'     => \PCRM\Gcal::redirect_uri(),
 			)
 		);
 	}
