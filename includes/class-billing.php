@@ -454,6 +454,7 @@ class Billing {
 		}
 		$event_id = $event_id ? sanitize_text_field( $event_id ) : 'h_' . hash( 'sha256', $raw );
 		$et       = Installer::table( 'billing_events' );
+		$quiet    = $wpdb->suppress_errors( true ); // A repeated event id is expected (Razorpay retries).
 		$ok       = $wpdb->insert(
 			$et,
 			array(
@@ -464,6 +465,7 @@ class Billing {
 				'created_at'              => Db::now(),
 			)
 		);
+		$wpdb->suppress_errors( $quiet );
 		if ( ! $ok ) {
 			return array( 'duplicate' => true );
 		}
