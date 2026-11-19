@@ -59,6 +59,13 @@ class Settings extends Base {
 					'receipt_prefix' => array( 'type' => 'string', 'max' => 10, 'label' => 'Receipt prefix' ),
 					'quote_validity' => array( 'type' => 'int', 'label' => 'Quotation validity' ),
 					'quote_terms'    => array( 'type' => 'text', 'label' => 'Terms' ),
+					'quote_intro'    => array( 'type' => 'text', 'label' => 'Quotation introduction' ),
+					'quote_closing'  => array( 'type' => 'text', 'label' => 'Closing message' ),
+					'quote_deliverables' => array( 'type' => 'text', 'label' => 'Default deliverables' ),
+					'quote_exclusions'   => array( 'type' => 'text', 'label' => 'Not included' ),
+					'quote_accent'   => array( 'type' => 'string', 'max' => 7, 'label' => 'Quotation colour' ),
+					'quote_show_prices' => array( 'type' => 'bool' ),
+					'gst_type'       => array( 'type' => 'enum', 'options' => array( 'intra' => 1, 'inter' => 1 ), 'label' => 'GST type' ),
 					'bank_details'   => array( 'type' => 'text', 'label' => 'Bank details' ),
 					'upi_id'         => array( 'type' => 'string', 'max' => 100, 'label' => 'UPI ID' ),
 					'wa_phone_id'    => array( 'type' => 'string', 'max' => 40, 'label' => 'WhatsApp Phone Number ID' ),
@@ -95,6 +102,28 @@ class Settings extends Base {
 			}
 			if ( isset( $s['gst_enabled'] ) ) {
 				$s['gst_enabled'] = (bool) $s['gst_enabled'];
+			}
+			if ( isset( $s['quote_show_prices'] ) ) {
+				$s['quote_show_prices'] = (bool) $s['quote_show_prices'];
+			}
+			if ( ! empty( $s['quote_accent'] ) && ! preg_match( '/^#[0-9A-Fa-f]{6}$/', $s['quote_accent'] ) ) {
+				return new \WP_Error( 'validation_failed', 'Quotation colour must be a hex colour like #F3724C.', array( 'status' => 422, 'errors' => array( 'quote_accent' => 'Use a colour like #F3724C.' ) ) );
+			}
+			foreach ( array( 'quote_deliverables' => 'Default deliverables', 'quote_exclusions' => 'Not included' ) as $k => $label ) {
+				if ( isset( $s[ $k ] ) ) {
+					$lines = Quotations::clean_lines( $s[ $k ], $label );
+					if ( is_wp_error( $lines ) ) {
+						return $lines;
+					}
+					$s[ $k ] = implode( "\n", $lines );
+				}
+			}
+			if ( array_key_exists( 'quote_payment_schedule', $in ) ) {
+				$sched = Quotations::clean_schedule( $in['quote_payment_schedule'] );
+				if ( is_wp_error( $sched ) ) {
+					return $sched;
+				}
+				$s['quote_payment_schedule'] = $sched;
 			}
 			Studios::update_settings( $this->sid(), $s );
 		}

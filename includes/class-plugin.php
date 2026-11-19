@@ -8,7 +8,7 @@ class Plugin {
 	const REST_NS = 'pcrm/v1';
 
 	public static function controllers() {
-		return array( 'Auth', 'Dashboard', 'Leads', 'Calls', 'Followups', 'Clients', 'Services', 'Quotations', 'Bookings', 'Payments', 'Expenses', 'Calendar', 'Team', 'Tasks', 'Documents', 'Reports', 'Whatsapp', 'Settings', 'Admin', 'Razorpay', 'Deliverables', 'Portal', 'Crew', 'Enquiry_Forms' );
+		return array( 'Auth', 'Dashboard', 'Leads', 'Calls', 'Followups', 'Clients', 'Services', 'Quotations', 'Bookings', 'Payments', 'Expenses', 'Calendar', 'Team', 'Tasks', 'Documents', 'Reports', 'Whatsapp', 'Settings', 'Admin', 'Razorpay', 'Deliverables', 'Portal', 'Crew', 'Enquiry_Forms', 'Quote_Packages' );
 	}
 
 	public static function init() {

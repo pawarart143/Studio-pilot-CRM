@@ -62,6 +62,7 @@ class Services extends Base {
 		}
 		global $wpdb;
 		$wpdb->update( Db::t( 'quotation_items' ), array( 'service_id' => null ), array( 'service_id' => $id, 'studio_id' => $this->sid() ) );
+		$wpdb->update( Db::t( 'quote_package_items' ), array( 'service_id' => null ), array( 'service_id' => $id, 'studio_id' => $this->sid() ) );
 		Db::delete( 'services', $id );
 		return $this->ok( array( 'deleted' => true ) );
 	}

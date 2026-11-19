@@ -14,6 +14,8 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'PCRM_VERSION', '0.6.0' );
 define( 'PCRM_DB_VERSION', '5' );
+// Quotation generator schema, versioned on its own option (pcrm_quote_db_version) so it never clashes with PCRM_DB_VERSION.
+define( 'PCRM_QUOTE_DB_VERSION', '1' );
 define( 'PCRM_FILE', __FILE__ );
 define( 'PCRM_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PCRM_URL', plugin_dir_url( __FILE__ ) );
