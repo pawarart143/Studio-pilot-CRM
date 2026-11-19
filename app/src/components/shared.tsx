@@ -231,6 +231,7 @@ export function WhatsAppModal({ open, onClose, ctx, template: initialTemplate, t
   const [api_, setApi] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [locked, setLocked] = useState('');
 
   useEffect(() => {
     if (open && initialTemplate) setTpl(initialTemplate);
@@ -249,7 +250,14 @@ export function WhatsAppModal({ open, onClose, ctx, template: initialTemplate, t
         setPhone(r.phone || '');
         setApi(!!r.api_configured);
       })
-      .catch((e) => toast(e.message, 'error'))
+      .then(() => !off && setLocked(''))
+      .catch((e) => {
+        if (off) return;
+        if (e.code === 'plan_feature' || e.code === 'plan_expired') {
+          setLocked(e.message);
+          setText('');
+        } else toast(e.message, 'error');
+      })
       .finally(() => !off && setLoading(false));
     return () => {
       off = true;
@@ -300,6 +308,13 @@ export function WhatsAppModal({ open, onClose, ctx, template: initialTemplate, t
       }
     >
       <div className="space-y-4">
+        {locked && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+            {locked}{' '}
+            {can('settings.edit') && <a className="font-semibold underline" href={window.PCRM.base + '/billing'}>See plans</a>}
+            <p className="mt-1 text-xs">You can still type your own message and number below.</p>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Template">
             <Select value={tpl} onChange={(e) => setTpl(e.target.value)} options={active.map((t) => [t.slug, t.name] as [string, string])} />
