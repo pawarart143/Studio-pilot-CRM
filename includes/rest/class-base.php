@@ -76,7 +76,7 @@ abstract class Base {
 	 * read-only mode, so the studio can still sign in, switch studio and pay.
 	 */
 	public static function read_only_allowed() {
-		return apply_filters( 'pcrm_read_only_allowed_routes', array( '/billing', '/auth', '/me', '/payment-links' ) );
+		return apply_filters( 'pcrm_read_only_allowed_routes', array( '/billing', '/auth', '/me', '/payment-links', '/notifications' ) );
 	}
 
 	/**
