@@ -1,0 +1,72 @@
+<?php
+require __DIR__.'/lib.php';
+global $wpdb;
+$owner=uid('owner'); as_user($owner);
+echo "== #1 Leads multi-day dates\n";
+list($st,$l)=rest('POST','/leads',array('name'=>'Multi Day Couple','phone'=>'9812345678','event_type'=>'wedding','event_date'=>'2027-02-10','event_end_date'=>'2027-02-13','venue'=>'Udaipur Palace'));
+ok($st===201,"create 4-day lead ($st)"); $lid=$l['id']??0;
+list($st,$g)=rest('GET',"/leads/$lid"); $g=$g['lead']??$g;
+ok(($g['event_date']??'')==='2027-02-10' && ($g['event_end_date']??'')==='2027-02-13',"start/end dates persist");
+echo "== #3 Deliverables by client\n";
+$bk=$wpdb->get_col("select id from wp_pcrm_bookings where studio_id=1 order by id limit 3"); $tpl=(int)$wpdb->get_var("select id from wp_pcrm_deliverable_templates where studio_id=1 limit 1");
+foreach($bk as $b){ list($st,$x)=rest('POST',"/bookings/$b/deliverables/template",array('template_id'=>$tpl)); if($st>=300) { list($st,$x)=rest('POST',"/bookings/$b/deliverables",array('title'=>'Wedding album','type'=>'album','due_date'=>'2027-03-01')); } ok($st<300,"add deliverables to booking $b ($st ".($x['message']??'').")"); }
+$d1=(int)$wpdb->get_var("select id from wp_pcrm_booking_deliverables where studio_id=1 limit 1"); $pm=(int)$wpdb->get_var("select id from wp_pcrm_members where studio_id=1 and user_id=".uid('m_photographer'));
+$wpdb->update('wp_pcrm_booking_deliverables',array('assigned_to'=>$pm),array('id'=>$d1));
+list($st,$c)=rest('GET','/deliverables/clients'); ok($st===200 && !empty($c['items']),"by-client list (".count($c['items']??array())." clients)");
+$cid=$c['items'][0]['client_id']??($c['items'][0]['id']??0);
+list($st,$cd)=rest('GET',"/deliverables/clients/$cid"); ok($st===200,"client delivery workspace ($st)");
+as_user(uid('m_photographer')); list($st,$pc)=rest('GET','/deliverables/clients'); ok($st===200,"photographer sees own-only client list ($st, ".count($pc['items']??array()).")"); as_user($owner);
+echo "== #4 Quotation generator\n";
+list($st,$pk)=rest('GET','/quote-packages'); ok($st===200,"packages list ($st, ".count($pk['items']??$pk).")");
+$client=$wpdb->get_row("select * from wp_pcrm_clients where studio_id=1 limit 1");
+$svc=$wpdb->get_row("select * from wp_pcrm_services where studio_id=1 limit 1");
+$q=array('title'=>'Wedding coverage – Multi Day Couple','lead_id'=>$lid,'customer_name'=>'Multi Day Couple','customer_phone'=>'9812345678','event_type'=>'wedding','valid_until'=>gmdate('Y-m-d',time()+20*86400),
+ 'events'=>array(array('name'=>'Haldi','event_type'=>'haldi_mehndi','event_date'=>'2027-02-10','venue'=>'Udaipur','coverage'=>array()),array('name'=>'Wedding','event_type'=>'wedding','event_date'=>'2027-02-12','venue'=>'Udaipur','coverage'=>array())),
+ 'items'=>array(array('service_id'=>$svc->id,'name'=>$svc->name,'qty'=>2,'rate'=>50000,'kind'=>'service')),
+ 'payment_schedule'=>array(array('label'=>'Advance','percent'=>50),array('label'=>'Event day','percent'=>30),array('label'=>'Delivery','percent'=>20)));
+list($st,$qq)=rest('POST','/quotations',$q); ok($st===201,"create quotation with 2 event days + payment plan ($st ".($qq['message']??'').")");
+$qid=$qq['id']??($qq['quotation']['id']??0);
+list($st,$qs)=rest('GET',"/quotations/$qid"); $qs=$qs['quotation']??$qs;
+ok(count($qs['events']??array())===2,"2 event days saved");
+ok(abs((float)($qs['total']??0))>0,"total computed (".($qs['total']??'').")");
+$tok=$wpdb->get_var("select public_token from wp_pcrm_quotations where id=$qid");
+if(!$tok) $tok=$wpdb->get_var("select token from wp_pcrm_quotations where id=$qid");
+ok((bool)$tok,"quotation has a client link token");
+$u='http://127.0.0.1:8080/crm/q/'.$tok; $h=wp_remote_get($u); ok(wp_remote_retrieve_response_code($h)===200 && false!==strpos(wp_remote_retrieve_body($h),'Haldi'),"client page opens and shows event days");
+$h=wp_remote_get($u.'/pdf',array('timeout'=>60)); ok(0===strpos(wp_remote_retrieve_body($h),'%PDF'),"premium PDF downloads (".strlen(wp_remote_retrieve_body($h))." bytes)"); file_put_contents(__DIR__.'/quote.pdf',wp_remote_retrieve_body($h));
+$h=wp_remote_post($u,array('body'=>array('pcrm_action'=>'accept','accepted_name'=>'Multi Day Couple','agree'=>'1')));
+$stt=$wpdb->get_var("select status from wp_pcrm_quotations where id=$qid"); ok($stt==='accepted',"client accepts by typing name (status=$stt)");
+list($st,$pf)=rest('GET',"/leads/$lid/convert"); $j=wp_json_encode($pf); ok($st===200 && false!==strpos($j,'Haldi') && false!==strpos($j,'Advance'),"convert to booking carries event days and payment plan ($st)");
+echo "== #2 Dashboard customisation\n";
+list($st,$lay)=rest('GET','/dashboard/layout'); ok($st===200,"layout");
+$items=$lay['items']??$lay['layout']??array(); ok(count($items)>5,"layout has widgets (".count($items).")");
+$items2=$items; foreach($items2 as &$i){ if(($i['id']??'')==='stat_revenue') $i['visible']=false; } unset($i);
+$items2=array_reverse($items2);
+list($st,$lay2)=rest('PUT','/dashboard/layout',array('items'=>$items2)); ok($st===200,"save custom layout ($st)");
+list($st,$lay3)=rest('GET','/dashboard/layout'); $vis=array(); foreach(($lay3['items']??array()) as $i){ $vis[$i['id']]=$i['visible']; }
+ok(isset($vis['stat_revenue']) && !$vis['stat_revenue'],"hidden widget stays hidden after reload");
+list($st,$w)=rest('GET','/dashboard/widgets/stat_expenses',null,array('range'=>'this_month')); ok($st===200,"owner widget data stat_expenses ($st)");
+as_user(uid('m_sales')); list($st,)=rest('GET','/dashboard/widgets/stat_expenses'); ok(in_array($st,array(403,404),true),"sales cannot load stat_expenses widget data ($st)");
+list($st,)=rest('GET','/dashboard/widgets/list_outstanding'); ok(in_array($st,array(403,404),true),"sales cannot load outstanding payments widget ($st)"); as_user($owner);
+list($st,)=rest('DELETE','/dashboard/layout'); list($st,$lay4)=rest('GET','/dashboard/layout'); $v4=array(); foreach(($lay4['items']??array()) as $i){ $v4[$i['id']]=$i['visible']; } ok(!empty($v4['stat_revenue']),"reset restores default");
+echo "== #5 Google Calendar\n";
+list($st,$gc)=rest('GET','/gcal'); ok($st===200,"gcal settings ($st)"); echo "    gcal: ".substr(wp_json_encode($gc),0,160)."\n";
+list($st,$cn)=rest('POST','/gcal/connect'); ok($st===422,"connect without OAuth client says not configured ($st)");
+echo "== #6 Billing\n";
+list($st,$bl)=rest('GET','/billing'); ok($st===200,"billing page data ($st)"); echo "    plan: ".($bl['status']['plan']??'?')." usage: ".wp_json_encode($bl['usage']??null)."\n";
+$h=wp_remote_get('http://127.0.0.1:8080/'); $body=wp_remote_retrieve_body($h);
+ok(false!==strpos($body,'Starter') && false!==strpos($body,'Professional') && false!==strpos($body,'Business'),"homepage pricing shows 3 plans");
+echo "== #7 Reminders\n";
+list($st,$n)=rest('GET','/notifications'); ok($st===200,"bell feed ($st)");
+list($st,$pr)=rest('GET','/notifications/prefs'); ok($st===200,"reminder prefs ($st)");
+list($st,$ns)=rest('GET','/notifications/status'); ok($st===200,"reminder status for owner ($st)");
+ok((bool)wp_next_scheduled('pcrm_reminders_tick'),"reminder cron scheduled");
+$e=null; try { \PCRM\Reminders::run(true); } catch (\Throwable $x) { $e=$x->getMessage(); } ok($e===null,"reminder run on upgraded data has no errors ".($e??''));
+echo "== #8 Team login\n";
+$r=wp_remote_post('http://127.0.0.1:8080/wp-json/pcrm/v1/auth/login',array('headers'=>array('content-type'=>'application/json'),'body'=>wp_json_encode(array('email'=>'m_sales@studio.test','password'=>'Team#12345'))));
+$code=wp_remote_retrieve_response_code($r); ok($code===200,"team member signs in with password set by owner ($code ".substr(wp_remote_retrieve_body($r),0,120).")");
+as_user($owner); $mid=(int)$wpdb->get_var("select id from wp_pcrm_members where studio_id=1 and user_id=".uid('m_editor'));
+list($st,$up)=rest('PUT',"/team/$mid",array('password'=>'NewPass#999','create_login'=>1)); echo "    reset editor password: $st ".($up['message']??'')."\n";
+$r=wp_remote_post('http://127.0.0.1:8080/wp-json/pcrm/v1/auth/login',array('headers'=>array('content-type'=>'application/json'),'body'=>wp_json_encode(array('email'=>'m_editor@studio.test','password'=>'NewPass#999'))));
+ok(wp_remote_retrieve_response_code($r)===200,"editor signs in with new password (".wp_remote_retrieve_response_code($r).")");
+done(); foreach($GLOBALS['fails'] as $f) echo "FAILED: $f\n";

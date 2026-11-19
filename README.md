@@ -15,6 +15,21 @@ Modules include:
 
 Defaults are INR (₹), India, DD-MM-YYYY, Asia/Kolkata and +91.
 
+## What's new in v0.6.0 (all of the 0.6.0 work in one plugin)
+
+Update with "Replace current with uploaded". Nothing is removed and no data is lost: v0.6.0 combines the eight 0.6.0 updates below into one build. Each one keeps its own database migration option (`pcrm_quote_db_version`, `pcrm_gcal_db_version`, `pcrm_reminders_db_version`, `pcrm_billing_db_version`), so they all run on the first page load after the update, alongside `pcrm_db_version` (still 5).
+
+- **Leads:** every day of a multi-day event is shown on the list and the lead page, not just the first and last date.
+- **Deliverables grouped by client** with a client delivery workspace.
+- **Quotation generator:** step builder, event days, packages, payment plan, premium PDF and client acceptance.
+- **Customizable dashboard:** per-user widgets, order, ranges and reset.
+- **Google Calendar sync** for bookings, tasks, follow-ups and payment reminders.
+- **Email, pop-up and ring-sound reminders** for tasks and follow-ups.
+- **Subscription billing:** Starter (15-day trial, 1 login, 50 leads a month), Professional (2 logins, 250 leads), Business (unlimited), Razorpay Subscriptions and homepage pricing. These plans are the only source of limits.
+- **Team sign-in fix and business access:** Payments, Expenses, Reports, Team, Settings and Plan are for the owner and admins only, checked on the server for every request, and the dashboard's money widgets follow the same rule.
+
+On update, v0.5.0 plans are mapped: Free becomes a Starter trial and Enterprise becomes Business.
+
 ## What's new in v0.6.0-deliverables (Deliverables grouped by client)
 
 Update with "Replace current with uploaded". No database changes and nothing is removed.
@@ -422,8 +437,6 @@ Test Mode keys (`rzp_test_…`) work the same way, so you can try it before goin
 | Razorpay payment links and webhook | Built and tested against simulated Razorpay responses, including webhook signature checks and duplicate webhooks. **Not yet tested with real Razorpay keys.** Try it with Test Mode keys first. |
 | Google sign-in | Built and tested against simulated Google responses. **Not yet tested with a real Google client ID.** |
 | Google Calendar sync (v0.6.0-gcal) | Built and tested end to end against a stand-in Google server that checks requests the way Google does (connect, create, edit, delete for all four types, multi-day bookings, outages, rate limits, expired tokens, calendar switch, disconnect, two studios kept apart). **Not yet tested against real Google** (needs a Google OAuth client with the Calendar API enabled). |
-| Plan billing for studios | Not included. The super admin sets plans by hand. |
-
 | Subscription billing (Razorpay Subscriptions, v0.6.0) | Built. Tested against a simulated Razorpay API and signed test webhooks (88 API checks) and in the browser with a simulated Checkout. **Not yet tested against real Razorpay test keys.** |
 | Email (reset, invites) | Uses WordPress `wp_mail`, so it needs working email on the server |
 
