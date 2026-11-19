@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       ShootPilot (Photographer CRM)
- * Description:       Multi-studio CRM for photographers: leads, pipeline, calling, quotations, bookings, payments, deliverables, client portal, calendar, team, tasks and reports. Open it at /crm.
- * Version:           0.5.0
+ * Description:       Multi-studio CRM for photographers: leads, pipeline, calling, quotations, bookings, payments, deliverables, client portal, calendar, team, tasks, reports and subscription billing. Open it at /crm.
+ * Version:           0.6.0-billing
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            ShootPilot
@@ -12,7 +12,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'PCRM_VERSION', '0.5.0' );
+define( 'PCRM_VERSION', '0.6.0-billing' );
 define( 'PCRM_DB_VERSION', '5' );
 define( 'PCRM_FILE', __FILE__ );
 define( 'PCRM_DIR', plugin_dir_path( __FILE__ ) );

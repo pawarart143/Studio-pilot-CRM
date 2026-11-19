@@ -10,6 +10,7 @@ class Installer {
 
 	public static function activate() {
 		self::install();
+		Billing_Installer::install();
 		if ( ! get_option( 'pcrm_super_admins' ) && get_current_user_id() && current_user_can( 'manage_options' ) ) {
 			update_option( 'pcrm_super_admins', array( get_current_user_id() ), false );
 		}

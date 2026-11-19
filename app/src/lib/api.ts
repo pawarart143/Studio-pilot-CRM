@@ -58,6 +58,10 @@ async function request<T>(method: string, path: string, body?: any, params?: Rec
     if ((res.status === 401 || code === 'rest_cookie_invalid_nonce') && !path.startsWith('auth/')) {
       window.location.href = boot().base + '/login?next=' + encodeURIComponent(window.location.pathname);
     }
+    if (res.status === 402 && json?.data?.upgrade && !path.startsWith('whatsapp/render')) {
+      // Plan limit, plan feature or ended trial: AppLayout shows an upgrade prompt.
+      window.dispatchEvent(new CustomEvent('pcrm:upgrade', { detail: { code, message: json?.message } }));
+    }
     throw new ApiError(res.status, code, json?.message || `Request failed (${res.status})`, json?.data);
   }
   return json as T;

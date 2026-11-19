@@ -14,7 +14,7 @@ $title       = 'ShootPilot | CRM & Studio Management Software for Photographers'
 $description = 'ShootPilot is the all-in-one CRM for photographers and studios: manage leads, follow-ups, quotations, bookings, payments, team and WhatsApp from one dashboard. Built for Indian photography businesses.';
 $canonical   = get_query_var( 'pcrm_landing' ) ? home_url( '/shootpilot/' ) : home_url( '/' );
 $og_image    = PCRM_URL . 'assets/brand/icon-512.png';
-$sections    = array( 'hero', 'capabilities', 'problems', 'features', 'showcase', 'how', 'solutions', 'pricing', 'testimonials', 'faq', 'cta' );
+$sections    = array( 'hero', 'capabilities', 'problems', 'features', 'operations', 'showcase', 'how', 'solutions', 'pricing', 'testimonials', 'faq', 'cta' );
 ?><!doctype html>
 <html lang="en-IN">
 <head>

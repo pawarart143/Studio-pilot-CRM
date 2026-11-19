@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
 				<a class="btn btn-primary btn-lg" href="<?php echo esc_url( $u['primary'] ); ?>"><?php echo $u['logged'] ? 'Open dashboard' : 'Start Free Today'; ?> <?php echo Landing::icon( 'arrow' ); // phpcs:ignore ?></a>
 				<a class="btn btn-onDark btn-lg" href="#product">Explore ShootPilot</a>
 			</div>
-			<p class="final-note">Free plan available · No card required · Your data stays in your studio</p>
+			<p class="final-note">15-day free trial · No card required · Your data stays in your studio</p>
 		</div>
 	</div>
 </section>
