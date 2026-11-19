@@ -156,8 +156,8 @@ export default function DeliverablesClient() {
                             ) : (
                               <DeliverableBadge status={d.status} />
                             )}
-                            <div className="col-span-2 flex items-center gap-2 sm:w-32"><ProgressBar value={d.progress} size="sm" /><span className="tabular w-9 text-right text-xs text-muted">{d.progress}%</span></div>
-                            <div className="col-span-2 flex items-center justify-end gap-1 sm:col-span-1">
+                            <div className="flex items-center gap-2 sm:w-32"><ProgressBar value={d.progress} size="sm" /><span className="tabular w-9 text-right text-xs text-muted">{d.progress}%</span></div>
+                            <div className="flex items-center justify-end gap-1 sm:w-28">
                               {['ready', 'delivered'].includes(d.status) && <WaButton ctx={{ booking_id: b.id, deliverable_id: d.id }} template="deliverable_ready" label="Notify" size="xs" variant="ghost" />}
                               {editable && <button onClick={() => setEdit({ d, bookingId: b.id })} className="rounded p-1.5 text-faint hover:bg-subtle hover:text-ink" aria-label={`Edit ${d.name}`}><Pencil className="h-4 w-4" /></button>}
                               {full && <button onClick={() => remove(d)} className="rounded p-1.5 text-faint hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10" aria-label={`Delete ${d.name}`}><Trash2 className="h-4 w-4" /></button>}

@@ -177,7 +177,7 @@ function ClientGroups({ items }: { items: any[] }) {
                   <p className="mb-1 flex justify-between text-xs"><span className="tabular font-medium">{c.delivered} of {c.total} done</span><span className="tabular text-muted">{c.progress}%</span></p>
                   <ProgressBar value={c.progress} size="sm" />
                 </div>
-                <div className="flex flex-col items-start gap-1 md:items-end">
+                <div className="flex flex-col items-start gap-1 md:w-36 md:items-end">
                   {allDone ? <DeliverableBadge status="delivered" /> : c.stage && <DeliverableBadge status={c.stage} />}
                   {c.overdue > 0 ? (
                     <span className="flex items-center gap-1 text-2xs font-medium text-red-600"><AlertTriangle className="h-3 w-3" /> {c.overdue} overdue</span>
