@@ -321,11 +321,8 @@ class Team extends Base {
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
-		if ( (int) $m->user_id === get_current_user_id() && isset( $data['status'] ) && 'inactive' === $data['status'] ) {
-			return new \WP_Error( 'validation_failed', 'You cannot deactivate yourself.', array( 'status' => 422 ) );
-		}
-		$b = $this->body( $req );
-		$new_password = isset( $b['password'] ) ? (string) $b['password'] : '';
+		$body         = $this->body( $req );
+		$new_password = isset( $body['password'] ) ? (string) $body['password'] : '';
 		$login_info   = null;
 		if ( $m->user_id ) {
 			$owned = $this->login_owned_by_studio( (int) $m->user_id );
@@ -358,7 +355,11 @@ class Team extends Base {
 				}
 			}
 		}
+		if ( (int) $m->user_id === get_current_user_id() && isset( $data['status'] ) && 'inactive' === $data['status'] ) {
+			return new \WP_Error( 'validation_failed', 'You cannot deactivate yourself.', array( 'status' => 422 ) );
+		}
 		Db::update( 'members', $id, $data );
+		$b = $this->body( $req );
 		if ( $m->user_id ) {
 			$u = get_userdata( (int) $m->user_id );
 			if ( $u && ! empty( $data['email'] ) && strtolower( $u->user_email ) !== strtolower( $data['email'] ) ) {
