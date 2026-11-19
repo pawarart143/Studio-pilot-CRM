@@ -20,6 +20,7 @@ const CalendarPage = lazy(() => import('@/pages/Calendar'));
 const Team = lazy(() => import('@/pages/Team'));
 const TeamProfile = lazy(() => import('@/pages/TeamProfile'));
 const Deliverables = lazy(() => import('@/pages/Deliverables'));
+const DeliverablesClient = lazy(() => import('@/pages/DeliverablesClient'));
 const Tasks = lazy(() => import('@/pages/Tasks'));
 const Clients = lazy(() => import('@/pages/clients/ClientsList'));
 const ClientDetail = lazy(() => import('@/pages/clients/ClientDetail'));
@@ -85,6 +86,7 @@ export default function App() {
             <Route path="/team" element={<Team />} />
             <Route path="/team/:id" element={<TeamProfile />} />
             <Route path="/deliverables" element={<Deliverables />} />
+            <Route path="/deliverables/clients/:id" element={<DeliverablesClient />} />
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/crew" element={<Crew />} />
             <Route path="/crew/members/:id" element={<CrewProfile />} />

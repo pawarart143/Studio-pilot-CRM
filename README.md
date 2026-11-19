@@ -14,6 +14,15 @@ Modules include:
 
 Defaults are INR (₹), India, DD-MM-YYYY, Asia/Kolkata and +91.
 
+## What's new in v0.6.0-deliverables (Deliverables grouped by client)
+
+Update with "Replace current with uploaded". No database changes and nothing is removed.
+
+- **Deliverables → By client** (the new default): one row per client instead of one row per deliverable. Each row shows every booking of that client, how many deliverables are done out of the total, overall progress, the current stage, and how many are overdue or when the next one is due. Status chips, overdue, search and the team member filter still work and decide which clients appear.
+- **Client delivery workspace** (click a client): all deliverables of that client in one place, grouped by booking. Change status and assignment right in the list, edit dates, link and notes, add or delete deliverables, apply a template, send WhatsApp updates, and hide delivered items. Crew who only see their own deliverables see only those here too.
+- **All items** keeps the previous one-row-per-deliverable list.
+- The booking's Deliverables tab links to the client's full delivery workspace.
+
 ## What's new in v0.5.0 (Crew Scheduling and Public Enquiry Form)
 
 Update with "Replace current with uploaded". Nothing is removed. The update adds new tables and a few new columns on leads (see "Database changes (v0.5.0)").
