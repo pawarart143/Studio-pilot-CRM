@@ -23,6 +23,7 @@ class Plugin {
 			}
 		);
 		Landing::init();
+		Gcal::init();
 		if ( isset( $_GET['pcrm_google'] ) ) { // phpcs:ignore
 			add_action( 'init', array( 'PCRM\\Google_Auth', 'handle' ), 20 );
 		}
